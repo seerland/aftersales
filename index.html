@@ -1,554 +1,493 @@
-<!--
-  ╔══════════════════════════════════════════════╗
-  ║  售后工单系统 - GitHub Pages + Supabase 版  ║
-  ║  配置已自动填入，直接上传使用                ║
-  ╚══════════════════════════════════════════════╝
--->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>售后处理需求单管理系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>售后处理需求单系统</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary: #1a6fb5; --primary-dark: #155a8f; --primary-light: #e8f4fb;
             --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
             --bg: #f0f4f8; --card-bg: #ffffff; --text: #1e293b; --text-secondary: #64748b;
-            --border: #e2e8f0; --border-focus: #1a6fb5;
-            --radius: 12px; --radius-sm: 8px; --radius-xs: 6px;
+            --border: #e2e8f0; --radius: 12px; --radius-sm: 8px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
             background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh;
-            padding-bottom: 20px;
+            padding-bottom: env(safe-area-inset-bottom);
         }
         .header {
             background: var(--card-bg); border-bottom: 1px solid var(--border);
-            padding: 14px 20px; position: sticky; top: 0; z-index: 100;
-            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+            padding: 12px 16px; position: sticky; top: 0; z-index: 100;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
         }
-        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-left { display: flex; align-items: center; gap: 10px; }
         .header-logo {
-            width: 40px; height: 40px; border-radius: 10px; background: var(--primary);
-            display: flex; align-items: center; justify-content: center; color: #fff; font-size: 20px; flex-shrink: 0;
+            width: 36px; height: 36px; border-radius: 10px; background: var(--primary);
+            display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px;
         }
-        .header-title { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
-        .header-subtitle { font-size: 0.78rem; color: var(--text-secondary); font-weight: 400; }
+        .header-title { font-size: 1rem; font-weight: 700; }
+        .header-subtitle { font-size: 0.7rem; color: var(--text-secondary); }
         .btn {
-            display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px;
-            border-radius: var(--radius-xs); font-size: 0.875rem; font-weight: 600; cursor: pointer;
-            border: 1.5px solid transparent; transition: all 0.2s; white-space: nowrap; text-decoration: none;
-            -webkit-tap-highlight-color: transparent; user-select: none;
+            display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px;
+            border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            border: 1px solid transparent; background: #fff; transition: all 0.2s; white-space: nowrap;
         }
         .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-        .btn-primary:hover { background: var(--primary-dark); }
         .btn-outline { background: #fff; color: var(--primary); border-color: var(--primary); }
-        .btn-outline:hover { background: var(--primary-light); }
         .btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
-        .btn-ghost:hover { background: #f8fafc; }
-        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
-        .container { max-width: 900px; margin: 0 auto; padding: 16px 16px 40px; }
+        .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+        .container { max-width: 900px; margin: 0 auto; padding: 12px 12px 30px; }
         .tabs-nav {
-            display: flex; gap: 0; background: var(--card-bg); border-radius: var(--radius);
-            padding: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 16px; overflow-x: auto;
+            display: flex; background: var(--card-bg); border-radius: var(--radius);
+            padding: 4px; margin-bottom: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch;
         }
         .tab-btn {
-            flex: 1 0 auto; padding: 11px 18px; border: none; background: transparent;
-            border-radius: 9px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
+            flex: 1 0 auto; padding: 10px 14px; border: none; background: transparent;
+            border-radius: 9px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
             color: var(--text-secondary); transition: all 0.2s; white-space: nowrap;
         }
-        .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
         .tab-badge {
-            display: inline-block; background: var(--danger); color: #fff; font-size: 0.7rem;
-            font-weight: 700; padding: 2px 7px; border-radius: 10px; margin-left: 4px; min-width: 18px; text-align: center;
+            background: var(--danger); color: #fff; font-size: 0.65rem; padding: 2px 6px;
+            border-radius: 10px; margin-left: 4px; display: none;
         }
+        .tab-badge.show { display: inline-block; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .card {
-            background: var(--card-bg); border-radius: var(--radius); padding: 20px 22px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 16px; border: 1px solid var(--border);
+            background: var(--card-bg); border-radius: var(--radius); padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 12px; border: 1px solid var(--border);
         }
-        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-        .card-title { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-        .icon-blue { background: #e8f4fb; color: var(--primary); }
-        .icon-green { background: #ecfdf5; color: var(--success); }
-        .icon-orange { background: #fff7ed; color: var(--warning); }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .form-group.full-width { grid-column: 1 / -1; }
-        .form-label { font-size: 0.83rem; font-weight: 600; display: flex; align-items: center; gap: 4px; }
-        .required-star { color: var(--danger); font-weight: 700; }
-        .optional-tag { font-size: 0.7rem; font-weight: 400; color: var(--text-secondary); background: #f1f5f9; padding: 1px 7px; border-radius: 4px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group.full { grid-column: 1 / -1; }
+        .form-label { font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 3px; }
+        .required-star { color: var(--danger); }
+        .optional-tag { font-size: 0.65rem; color: var(--text-secondary); background: #f1f5f9; padding: 1px 5px; border-radius: 4px; }
         .form-input, .form-select, .form-textarea {
-            width: 100%; padding: 10px 13px; border: 1.5px solid var(--border); border-radius: var(--radius-xs);
-            font-size: 0.9rem; font-family: inherit; color: var(--text); background: #fafbfc; transition: all 0.2s; outline: none;
+            width: 100%; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 6px;
+            font-size: 0.85rem; font-family: inherit; background: #fafbfc; transition: all 0.2s; outline: none;
         }
-        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--border-focus); background: #fff; }
-        .form-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 35px; cursor: pointer; }
-        .form-textarea { resize: vertical; min-height: 90px; }
-        .form-error { font-size: 0.75rem; color: var(--danger); margin-top: 2px; display: none; }
-        .form-group.error .form-input, .form-group.error .form-select, .form-group.error .form-textarea { border-color: var(--danger); background: #fff5f5; }
-        .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); background: #fff; }
+        .form-textarea { resize: vertical; min-height: 80px; }
+        .form-error { font-size: 0.7rem; color: var(--danger); display: none; }
+        .form-group.error .form-input { border-color: var(--danger); background: #fff5f5; }
+        .file-upload-area {
+            border: 1.5px dashed var(--border); border-radius: 8px; padding: 16px;
+            text-align: center; cursor: pointer; background: #fafcfd; transition: all 0.2s;
+        }
+        .file-upload-area:hover { border-color: var(--primary); background: #f0f7ff; }
+        .file-list { margin-top: 8px; font-size: 0.8rem; }
+        .file-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+        .file-item .remove-file { color: var(--danger); cursor: pointer; font-weight: bold; margin-left: auto; }
+        .order-list { display: flex; flex-direction: column; gap: 8px; }
+        .order-item {
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .order-id { font-family: monospace; font-weight: 700; color: var(--primary); min-width: 100px; }
+        .order-info { flex: 1; }
+        .order-info .hospital { font-weight: 600; font-size: 0.85rem; }
+        .order-info .device { font-size: 0.73rem; color: var(--text-secondary); }
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
+            border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+        }
         .status-pending { background: #fff7ed; color: #c2410c; }
         .status-processing { background: #eff6ff; color: #1d4ed8; }
         .status-completed { background: #ecfdf5; color: #065f46; }
-        .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-        .pending { background: #f97316; } .processing { background: #3b82f6; } .completed { background: #10b981; }
-        .order-list { display: flex; flex-direction: column; gap: 10px; }
-        .order-item {
-            background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 14px 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-        }
-        .order-id { font-family: monospace; font-weight: 700; font-size: 0.9rem; color: var(--primary); min-width: 110px; }
-        .order-info { flex: 1; min-width: 140px; }
-        .order-info .hospital { font-weight: 600; font-size: 0.9rem; }
-        .order-info .device { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
-        .order-date { font-size: 0.73rem; color: var(--text-secondary); white-space: nowrap; }
-        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
-        .highlight-box { background: #fffde7; border: 1.5px solid #fde68a; border-radius: var(--radius-sm); padding: 12px 16px; font-weight: 600; font-size: 0.9rem; text-align: center; }
-        .highlight-box .big-id { font-family: monospace; font-size: 1.4rem; font-weight: 800; color: var(--primary); display: block; }
         .modal-overlay {
-            position: fixed; inset: 0; background: rgba(15,23,42,0.55); z-index: 200;
-            display: flex; align-items: center; justify-content: center; padding: 16px;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200;
+            display: flex; align-items: center; justify-content: center; padding: 12px;
         }
         .modal-dialog {
-            background: #fff; border-radius: var(--radius); width: 100%; max-width: 600px;
-            max-height: 85vh; overflow-y: auto; box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+            background: #fff; border-radius: var(--radius); width: 100%; max-width: 500px;
+            max-height: 80vh; overflow-y: auto; padding: 16px;
         }
-        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: #fff; z-index: 10; }
-        .modal-title { font-weight: 700; font-size: 1rem; }
-        .modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: #f1f5f9; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
-        .modal-body { padding: 20px; }
-        .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; position: sticky; bottom: 0; background: #fff; }
-        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-        .toast { padding: 12px 16px; border-radius: var(--radius-xs); color: #fff; font-weight: 600; font-size: 0.85rem; box-shadow: 0 12px 32px rgba(0,0,0,0.12); animation: toastIn 0.35s ease, toastOut 0.35s ease 2.5s forwards; pointer-events: auto; }
+        .toast-container { position: fixed; top: 12px; right: 12px; z-index: 300; display: flex; flex-direction: column; gap: 6px; }
+        .toast {
+            padding: 10px 14px; border-radius: 6px; color: #fff; font-size: 0.8rem; font-weight: 600;
+            animation: fadeIn 0.3s ease;
+        }
         .toast-success { background: #059669; } .toast-error { background: #dc2626; } .toast-info { background: #2563eb; }
-        @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes toastOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(40px); } }
-        .qr-section { text-align: center; padding: 8px; }
-        .qr-img { width: 180px; height: 180px; border-radius: var(--radius-sm); border: 3px solid var(--border); display: inline-block; background: #fff; }
-        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; }
-        @media (max-width: 480px) { .detail-grid { grid-template-columns: 1fr; } }
-        .detail-item { padding: 8px 10px; background: #f8fafc; border-radius: 6px; display: flex; flex-direction: column; gap: 2px; }
-        .detail-label { font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
-        .detail-value { font-weight: 600; color: var(--text); word-break: break-word; }
-        .detail-divider { border: none; border-top: 1.5px dashed var(--border); margin: 14px 0; }
-        .search-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-        .search-bar .form-input { flex: 1; min-width: 180px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
     </style>
 </head>
 <body>
-
-<!-- ==================== Header ==================== -->
-<header class="header">
-    <div class="header-left">
-        <div class="header-logo">🔧</div>
-        <div>
-            <div class="header-title">售后处理需求单系统</div>
-            <div class="header-subtitle">快速提交 · 高效追踪</div>
-        </div>
-    </div>
-    <div class="header-actions">
-        <button class="btn btn-ghost btn-sm" onclick="showQRCode()">📱 二维码入口</button>
-        <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 导出CSV</button>
-        <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ 打印</button>
-    </div>
-</header>
-
-<div class="toast-container" id="toastContainer"></div>
-
-<div class="container">
-    <nav class="tabs-nav">
-        <button class="tab-btn active" data-tab="tab-request" onclick="switchTab('tab-request')">📝 需求提交</button>
-        <button class="tab-btn" data-tab="tab-service" onclick="switchTab('tab-service')">🔍 售后处理</button>
-        <button class="tab-btn" data-tab="tab-list" onclick="switchTab('tab-list')" id="tabListBtn">📋 工单列表 <span class="tab-badge" id="pendingBadge"></span></button>
-    </nav>
-
-    <!-- 需求提交 Tab -->
-    <div class="tab-content active" id="tab-request">
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title"><span class="icon-blue" style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;">📝</span> 提交售后需求</div>
-                <span style="font-size:0.78rem;color:var(--text-secondary);">工单号将自动生成</span>
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">🔧</div>
+            <div>
+                <div class="header-title">售后处理需求单系统</div>
+                <div class="header-subtitle">扫码提交 · 云端同步</div>
             </div>
-            <form id="requestForm" onsubmit="submitRequest(event)" novalidate>
+        </div>
+        <div>
+            <button class="btn btn-ghost btn-sm" onclick="showQRCode()">📱 二维码入口</button>
+            <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 导出CSV</button>
+        </div>
+    </header>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="container">
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="tab-request" onclick="switchTab('tab-request')">📝 需求提交</button>
+            <button class="tab-btn" data-tab="tab-service" onclick="switchTab('tab-service')">🔍 售后处理</button>
+            <button class="tab-btn" data-tab="tab-list" onclick="switchTab('tab-list')" id="tabListBtn">📋 工单列表 <span class="tab-badge" id="pendingBadge"></span></button>
+        </nav>
+
+        <!-- 需求提交 -->
+        <div class="tab-content active" id="tab-request">
+            <div class="card">
+                <h3 style="margin-bottom:12px;">提交售后需求</h3>
                 <div class="form-grid">
+                    <div class="form-group full" id="orderIdGroup">
+                        <label class="form-label">工单号 <span style="font-size:0.7rem;">(自动生成，可修改)</span></label>
+                        <input type="text" class="form-input" id="orderIdInput" style="font-family:monospace;font-weight:bold;" readonly>
+                    </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> 公司名称</label>
                         <select class="form-select" id="companyName" required>
-                            <option value="">请选择公司</option>
+                            <option value="">请选择</option>
                             <option value="数智">数智</option>
                             <option value="粉蓝">粉蓝</option>
                             <option value="明理">明理</option>
                         </select>
-                        <span class="form-error">⚠️ 请选择公司名称</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> 医院名称</label>
-                        <input type="text" class="form-input" id="hospitalName" placeholder="请输入医院全称" required>
-                        <span class="form-error">⚠️ 请填写医院全称</span>
+                        <input type="text" class="form-input" id="hospitalName" placeholder="医院全称" required>
                     </div>
-                    <div class="form-group full-width">
+                    <div class="form-group full">
                         <label class="form-label">医院地址 <span class="optional-tag">选填</span></label>
-                        <input type="text" class="form-input" id="hospitalAddress" placeholder="用于快递寄收（选填）">
+                        <input type="text" class="form-input" id="hospitalAddress" placeholder="用于快递寄收">
                     </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> 反馈人姓名</label>
-                        <input type="text" class="form-input" id="feedbackName" placeholder="销售/实施/商务姓名" required>
-                        <span class="form-error">⚠️ 请填写反馈人姓名</span>
+                        <input type="text" class="form-input" id="feedbackName" placeholder="销售/实施/商务">
                     </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> 反馈人联系方式</label>
-                        <input type="tel" class="form-input" id="feedbackPhone" placeholder="手机号码" required>
-                        <span class="form-error">⚠️ 请填写反馈人联系方式</span>
+                        <input type="tel" class="form-input" id="feedbackPhone" placeholder="手机号码">
                     </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> 客户姓名</label>
-                        <input type="text" class="form-input" id="customerName" placeholder="售后现场联系人姓名" required>
-                        <span class="form-error">⚠️ 请填写客户姓名</span>
+                        <input type="text" class="form-input" id="customerName" placeholder="客户姓名">
                     </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> 客户联系方式</label>
-                        <input type="tel" class="form-input" id="customerPhone" placeholder="售后现场联系电话" required>
-                        <span class="form-error">⚠️ 请填写客户联系方式</span>
+                        <input type="tel" class="form-input" id="customerPhone" placeholder="客户联系方式">
                     </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> 设备名称</label>
-                        <input type="text" class="form-input" id="deviceName" placeholder="故障设备名称" required>
-                        <span class="form-error">⚠️ 请填写设备名称</span>
+                        <input type="text" class="form-input" id="deviceName" placeholder="故障设备名称">
                     </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> 型号</label>
-                        <input type="text" class="form-input" id="deviceModel" placeholder="设备型号" required>
-                        <span class="form-error">⚠️ 请填写设备型号</span>
+                        <input type="text" class="form-input" id="deviceModel" placeholder="设备型号">
                     </div>
                     <div class="form-group">
                         <label class="form-label"><span class="required-star">*</span> SN号</label>
-                        <input type="text" class="form-input" id="snNumber" placeholder="设备序列号" required>
-                        <span class="form-error">⚠️ 请填写SN号</span>
+                        <input type="text" class="form-input" id="snNumber" placeholder="设备序列号">
                     </div>
-                    <div class="form-group full-width">
+                    <div class="form-group full">
                         <label class="form-label"><span class="required-star">*</span> 现场异常情况描述</label>
-                        <textarea class="form-textarea" id="faultDescription" placeholder="请详细描述现场已知故障信息..." required></textarea>
-                        <span class="form-error">⚠️ 请描述现场异常情况</span>
+                        <textarea class="form-textarea" id="faultDescription" placeholder="详细描述现场故障信息..."></textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">附件 <span class="optional-tag">图片/视频</span></label>
+                        <div class="file-upload-area" id="fileDropArea">
+                            <p>📎 点击或拖拽上传（图片/视频）</p>
+                            <input type="file" id="fileInput" accept="image/*,video/*" multiple style="display:none;">
+                        </div>
+                        <div class="file-list" id="fileList"></div>
                     </div>
                 </div>
-                <div class="mt-3 text-center" style="margin-top:14px;">
-                    <button type="submit" class="btn btn-primary" style="font-size:1rem;padding:12px 36px;">✅ 提交需求单</button>
+                <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center;" onclick="submitRequest()">✅ 提交需求单</button>
+            </div>
+        </div>
+
+        <!-- 售后处理 -->
+        <div class="tab-content" id="tab-service">
+            <div class="card">
+                <h3 style="margin-bottom:12px;">查找工单并处理</h3>
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" class="form-input" id="searchOrderId" placeholder="输入工单号" style="flex:1;">
+                    <button class="btn btn-primary" onclick="searchOrder()">查找</button>
                 </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- 售后处理 Tab -->
-    <div class="tab-content" id="tab-service">
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title"><span class="icon-orange" style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;">🔍</span> 查找工单并处理</div>
-            </div>
-            <div class="search-bar">
-                <input type="text" class="form-input" id="searchOrderId" placeholder="输入工单号，如：20260528001" onkeydown="if(event.key==='Enter')searchOrder()">
-                <button class="btn btn-primary" onclick="searchOrder()">🔍 查找</button>
-            </div>
-            <div id="serviceResult" style="display:none;"></div>
-            <div id="serviceEmpty" class="empty-state">
-                <span class="empty-icon" style="font-size:3rem;display:block;">🔎</span>
-                <p>请输入工单号进行查找</p>
-                <p style="font-size:0.78rem;color:var(--text-secondary);">或前往「工单列表」查看所有工单</p>
+                <div id="serviceResult"></div>
+                <div id="serviceEmpty" style="color:var(--text-secondary);text-align:center;">请输入工单号查找</div>
             </div>
         </div>
-    </div>
 
-    <!-- 工单列表 Tab -->
-    <div class="tab-content" id="tab-list">
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title"><span class="icon-green" style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;">📋</span> 全部工单</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <select class="form-select" id="statusFilter" onchange="renderOrderList()" style="width:auto;min-width:110px;padding:7px 28px 7px 10px;font-size:0.8rem;">
+        <!-- 工单列表 -->
+        <div class="tab-content" id="tab-list">
+            <div class="card">
+                <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                    <select class="form-select" id="statusFilter" onchange="renderOrderList()" style="width:auto;">
                         <option value="all">全部状态</option>
                         <option value="pending">待处理</option>
                         <option value="processing">处理中</option>
                         <option value="completed">已完成</option>
                     </select>
-                    <input type="text" class="form-input" id="listSearchInput" placeholder="搜索工单号/医院..." style="width:auto;min-width:140px;padding:7px 10px;font-size:0.8rem;" oninput="renderOrderList()">
+                    <input type="text" class="form-input" id="listSearchInput" placeholder="搜索工单号/医院" oninput="renderOrderList()" style="flex:1;">
                 </div>
+                <div class="order-list" id="orderListContainer"></div>
             </div>
-            <div class="order-list" id="orderListContainer"></div>
         </div>
     </div>
-</div>
 
-<!-- 工单详情弹窗 -->
-<div class="modal-overlay" id="detailModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
-    <div class="modal-dialog">
-        <div class="modal-header">
-            <span class="modal-title">📄 工单详情</span>
-            <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    <!-- 二维码弹窗 -->
+    <div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
+        <div class="modal-dialog" style="text-align:center;">
+            <h3>📱 扫码访问系统</h3>
+            <img id="qrImage" style="width:180px;height:180px;margin:10px auto;">
+            <p id="qrUrlDisplay" style="word-break:break-all;font-size:0.8rem;color:var(--text-secondary);"></p>
+            <button class="btn btn-outline btn-sm" onclick="copyCurrentURL()">复制链接</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeQRModal()">关闭</button>
         </div>
-        <div class="modal-body" id="detailModalBody"></div>
-        <div class="modal-footer" id="detailModalFooter"></div>
     </div>
-</div>
 
-<!-- 二维码弹窗 -->
-<div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
-    <div class="modal-dialog" style="max-width:420px;">
-        <div class="modal-header">
-            <span class="modal-title">📱 系统入口二维码</span>
-            <button class="modal-close" onclick="closeQRModal()">✕</button>
-        </div>
-        <div class="modal-body qr-section">
-            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">扫描二维码即可在手机上打开系统，快速提交需求</p>
-            <img id="qrImage" class="qr-img" src="" alt="系统入口二维码">
-            <p class="qr-caption">扫一扫，快速填写售后需求</p>
-            <code class="qr-url" id="qrUrlDisplay" style="font-family:monospace;font-size:0.7rem;word-break:break-all;background:#f8fafc;padding:8px;border-radius:6px;display:block;margin-top:8px;"></code>
-            <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="copyCurrentURL()">📋 复制链接</button>
-        </div>
+    <!-- 工单详情弹窗 -->
+    <div class="modal-overlay" id="detailModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
+        <div class="modal-dialog" id="detailModalContent"></div>
     </div>
-</div>
 
 <script>
-    // ==================== 配置（已使用您的 Supabase 信息） ====================
-    const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
-
-    // ==================== 初始化 Supabase ====================
+    // ================== 配置（已由用户替换） ==================
+    const SUPABASE_URL = 'https://your-project.supabase.co';   // 你的URL
+    const SUPABASE_ANON_KEY = 'your-anon-key';                // 你的anon key
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ==================== 数据操作 ====================
+    // ================== 全局变量 ==================
+    let uploadedFiles = []; // 暂存待上传文件对象
+
+    // ================== 工具函数 ==================
+    function showToast(msg, type='info') {
+        const container = document.getElementById('toastContainer');
+        const div = document.createElement('div');
+        div.className = `toast toast-${type}`;
+        div.textContent = msg;
+        container.appendChild(div);
+        setTimeout(() => div.remove(), 3000);
+    }
+
     async function getAllOrders() {
         const { data, error } = await supabase.from('workorders').select('*').order('created_at', { ascending: false });
-        if (error) { console.error('获取工单失败:', error); return []; }
-        return data.map(order => ({
-            id: order.id,
-            companyName: order.company_name,
-            hospitalName: order.hospital_name,
-            hospitalAddress: order.hospital_address || '',
-            feedbackName: order.feedback_name,
-            feedbackPhone: order.feedback_phone,
-            customerName: order.customer_name,
-            customerPhone: order.customer_phone,
-            deviceName: order.device_name,
-            deviceModel: order.device_model,
-            snNumber: order.sn_number,
-            faultDescription: order.fault_description,
-            afterSalesRecord: order.after_sales_record || '',
-            afterSalesSolution: order.after_sales_solution || '',
-            status: order.status,
-            createdAt: order.created_at,
-            updatedAt: order.updated_at,
+        if (error) { console.error(error); return []; }
+        return data.map(o => ({
+            id: o.id, companyName: o.company_name, hospitalName: o.hospital_name,
+            hospitalAddress: o.hospital_address, feedbackName: o.feedback_name,
+            feedbackPhone: o.feedback_phone, customerName: o.customer_name,
+            customerPhone: o.customer_phone, deviceName: o.device_name,
+            deviceModel: o.device_model, snNumber: o.sn_number,
+            faultDescription: o.fault_description, afterSalesRecord: o.after_sales_record,
+            afterSalesSolution: o.after_sales_solution, status: o.status,
+            attachments: o.attachments || [], createdAt: o.created_at, updatedAt: o.updated_at
         }));
     }
 
-    async function saveOrder(order) {
-        const { error } = await supabase.from('workorders').insert({
-            id: order.id,
-            company_name: order.companyName,
-            hospital_name: order.hospitalName,
-            hospital_address: order.hospitalAddress || null,
-            feedback_name: order.feedbackName,
-            feedback_phone: order.feedbackPhone,
-            customer_name: order.customerName,
-            customer_phone: order.customerPhone,
-            device_name: order.deviceName,
-            device_model: order.deviceModel,
-            sn_number: order.snNumber,
-            fault_description: order.faultDescription,
-            after_sales_record: order.afterSalesRecord || '',
-            after_sales_solution: order.afterSalesSolution || '',
-            status: order.status,
-            created_at: order.createdAt || new Date().toISOString(),
-            updated_at: order.updatedAt || new Date().toISOString(),
-        });
-        if (error) throw error;
+    async function generateOrderId() {
+        const now = new Date();
+        const prefix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+        const orders = await getAllOrders();
+        const todayOrders = orders.filter(o => o.id.startsWith(prefix));
+        let maxSeq = 0;
+        todayOrders.forEach(o => { const num = parseInt(o.id.slice(8)); if(num>maxSeq) maxSeq=num; });
+        return prefix + String(maxSeq+1).padStart(3,'0');
     }
 
-    async function updateOrderById(orderId, updates) {
-        const data = { updated_at: new Date().toISOString() };
-        if (updates.afterSalesRecord !== undefined) data.after_sales_record = updates.afterSalesRecord;
-        if (updates.afterSalesSolution !== undefined) data.after_sales_solution = updates.afterSalesSolution;
-        if (updates.status !== undefined) data.status = updates.status;
-        const { error } = await supabase.from('workorders').update(data).eq('id', orderId);
-        if (error) throw error;
-    }
+    // 初始化工单号显示
+    (async function initOrderId() {
+        const id = await generateOrderId();
+        document.getElementById('orderIdInput').value = id;
+    })();
 
-    async function deleteOrderById(orderId) {
-        const { error } = await supabase.from('workorders').delete().eq('id', orderId);
-        if (error) throw error;
-    }
+    // ================== 文件上传处理 ==================
+    const fileInput = document.getElementById('fileInput');
+    const fileDropArea = document.getElementById('fileDropArea');
+    const fileList = document.getElementById('fileList');
 
-    // ==================== 工具函数 ====================
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        const icons = { success: '✅', error: '❌', info: 'ℹ️' };
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML = `${icons[type] || ''} ${message}`;
-        container.appendChild(toast);
-        setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
-    }
+    fileDropArea.addEventListener('click', () => fileInput.click());
+    fileDropArea.addEventListener('dragover', (e) => { e.preventDefault(); fileDropArea.style.borderColor = 'var(--primary)'; });
+    fileDropArea.addEventListener('dragleave', () => fileDropArea.style.borderColor = 'var(--border)');
+    fileDropArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileDropArea.style.borderColor = 'var(--border)';
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(tb => tb.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
-        if (tabId === 'tab-list') renderOrderList();
-        if (tabId === 'tab-service') {
-            document.getElementById('serviceResult').style.display = 'none';
-            document.getElementById('serviceEmpty').style.display = 'block';
-            document.getElementById('searchOrderId').value = '';
+    function handleFiles(files) {
+        for (let file of files) {
+            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+                showToast('仅支持图片和视频文件', 'error');
+                continue;
+            }
+            if (file.size > 50 * 1024 * 1024) {
+                showToast('单个文件不能超过50MB', 'error');
+                continue;
+            }
+            uploadedFiles.push(file);
         }
-        updatePendingBadge();
+        renderFileList();
     }
-    window.switchTab = switchTab;
 
-    // 表单验证
-    function clearFormErrors() {
-        document.querySelectorAll('#requestForm .form-group').forEach(fg => fg.classList.remove('error'));
+    function renderFileList() {
+        fileList.innerHTML = uploadedFiles.map((file, idx) => `
+            <div class="file-item">
+                <span>📄 ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)</span>
+                <span class="remove-file" onclick="removeFile(${idx})">✕</span>
+            </div>
+        `).join('');
     }
-    function validateForm() {
-        clearFormErrors();
+    window.removeFile = function(idx) {
+        uploadedFiles.splice(idx, 1);
+        renderFileList();
+    };
+
+    async function uploadFiles(orderId) {
+        if (uploadedFiles.length === 0) return [];
+        const urls = [];
+        for (let file of uploadedFiles) {
+            const fileName = `${orderId}/${Date.now()}_${file.name}`;
+            const { error } = await supabase.storage.from('attachments').upload(fileName, file);
+            if (error) {
+                console.error('上传失败:', error);
+                showToast(`文件 ${file.name} 上传失败`, 'error');
+                continue;
+            }
+            const { data } = supabase.storage.from('attachments').getPublicUrl(fileName);
+            urls.push(data.publicUrl);
+        }
+        return urls;
+    }
+
+    // ================== 表单提交 ==================
+    async function submitRequest() {
+        // 简单必填校验
+        const required = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
         let valid = true;
-        const fields = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
-        fields.forEach(id => {
+        required.forEach(id => {
             const el = document.getElementById(id);
             if (!el.value.trim()) {
                 el.closest('.form-group').classList.add('error');
                 valid = false;
+            } else {
+                el.closest('.form-group').classList.remove('error');
             }
         });
-        return valid;
-    }
+        if (!valid) { showToast('请填写所有必填项', 'error'); return; }
 
-    // 生成工单号（异步）
-    async function generateOrderId() {
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth()+1).padStart(2,'0');
-        const d = String(now.getDate()).padStart(2,'0');
-        const prefix = `${y}${m}${d}`;
-        const orders = await getAllOrders();
-        const todayOrders = orders.filter(o => o.id && o.id.startsWith(prefix));
-        let maxSeq = 0;
-        todayOrders.forEach(o => { const seq = parseInt(o.id.slice(8)); if(seq>maxSeq) maxSeq = seq; });
-        return prefix + String(maxSeq+1).padStart(3,'0');
-    }
-
-    // 提交需求
-    async function submitRequest(event) {
-        event.preventDefault();
-        if(!validateForm()) { showToast('请检查必填信息','error'); return; }
-        const orderId = await generateOrderId();
-        const newOrder = {
-            id: orderId,
-            companyName: document.getElementById('companyName').value.trim(),
-            hospitalName: document.getElementById('hospitalName').value.trim(),
-            hospitalAddress: document.getElementById('hospitalAddress').value.trim(),
-            feedbackName: document.getElementById('feedbackName').value.trim(),
-            feedbackPhone: document.getElementById('feedbackPhone').value.trim(),
-            customerName: document.getElementById('customerName').value.trim(),
-            customerPhone: document.getElementById('customerPhone').value.trim(),
-            deviceName: document.getElementById('deviceName').value.trim(),
-            deviceModel: document.getElementById('deviceModel').value.trim(),
-            snNumber: document.getElementById('snNumber').value.trim(),
-            faultDescription: document.getElementById('faultDescription').value.trim(),
-            afterSalesRecord: '', afterSalesSolution: '', status: 'pending',
-            createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
-        };
-        try {
-            await saveOrder(newOrder);
-            document.getElementById('requestForm').reset();
-            clearFormErrors();
-            updatePendingBadge();
-            showToast(`工单 ${orderId} 提交成功！`,'success');
-            // 高亮显示
-            const card = document.querySelector('#tab-request .card');
-            const box = document.createElement('div');
-            box.className = 'highlight-box';
-            box.innerHTML = `✅ 提交成功！工单号：<span class="big-id">${orderId}</span>`;
-            card.insertBefore(box, card.querySelector('form'));
-            setTimeout(() => box.remove(), 5000);
-        } catch(e) {
-            showToast('提交失败，请重试','error');
-        }
-    }
-    window.submitRequest = submitRequest;
-
-    // 搜索工单
-    async function searchOrder() {
-        const orderId = document.getElementById('searchOrderId').value.trim();
-        if(!orderId) return;
-        const orders = await getAllOrders();
-        const order = orders.find(o => o.id === orderId);
-        const resultDiv = document.getElementById('serviceResult');
-        const emptyDiv = document.getElementById('serviceEmpty');
-        if(!order) {
-            resultDiv.style.display = 'none';
-            emptyDiv.style.display = 'block';
-            emptyDiv.innerHTML = '<span class="empty-icon" style="font-size:3rem;">😕</span><p>未找到工单：<strong>'+orderId+'</strong></p>';
+        const orderId = document.getElementById('orderIdInput').value.trim();
+        // 检查工单号是否已存在
+        const existing = await getAllOrders();
+        if (existing.some(o => o.id === orderId)) {
+            showToast('工单号已存在，请修改', 'error');
             return;
         }
-        emptyDiv.style.display = 'none';
-        resultDiv.style.display = 'block';
-        resultDiv.innerHTML = buildServiceHTML(order);
-    }
-    window.searchOrder = searchOrder;
 
-    function buildServiceHTML(order) {
-        return `
-        <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;">
-            <strong>📋 ${order.id}</strong> | ${order.hospitalName} | ${order.deviceName}
-        </div>
-        <div class="form-grid">
-            <div class="form-group full-width">
-                <label>🔍 售后核实记录</label>
-                <textarea class="form-textarea" id="afterSalesRecord-${order.id}">${order.afterSalesRecord||''}</textarea>
-            </div>
-            <div class="form-group full-width">
-                <label>🛠️ 售后处理方案</label>
-                <textarea class="form-textarea" id="afterSalesSolution-${order.id}">${order.afterSalesSolution||''}</textarea>
-            </div>
-        </div>
-        <button class="btn btn-primary" style="margin-top:10px;" onclick="saveServiceInfo('${order.id}')">💾 保存售后信息</button>
-        `;
+        // 先上传附件
+        const attachmentUrls = await uploadFiles(orderId);
+
+        const newOrder = {
+            id: orderId,
+            companyName: document.getElementById('companyName').value,
+            hospitalName: document.getElementById('hospitalName').value,
+            hospitalAddress: document.getElementById('hospitalAddress').value,
+            feedbackName: document.getElementById('feedbackName').value,
+            feedbackPhone: document.getElementById('feedbackPhone').value,
+            customerName: document.getElementById('customerName').value,
+            customerPhone: document.getElementById('customerPhone').value,
+            deviceName: document.getElementById('deviceName').value,
+            deviceModel: document.getElementById('deviceModel').value,
+            snNumber: document.getElementById('snNumber').value,
+            faultDescription: document.getElementById('faultDescription').value,
+            afterSalesRecord: '',
+            afterSalesSolution: '',
+            status: 'pending',
+            attachments: attachmentUrls,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        const { error } = await supabase.from('workorders').insert({
+            id: newOrder.id,
+            company_name: newOrder.companyName,
+            hospital_name: newOrder.hospitalName,
+            hospital_address: newOrder.hospitalAddress,
+            feedback_name: newOrder.feedbackName,
+            feedback_phone: newOrder.feedbackPhone,
+            customer_name: newOrder.customerName,
+            customer_phone: newOrder.customerPhone,
+            device_name: newOrder.deviceName,
+            device_model: newOrder.deviceModel,
+            sn_number: newOrder.snNumber,
+            fault_description: newOrder.faultDescription,
+            after_sales_record: '',
+            after_sales_solution: '',
+            status: 'pending',
+            attachments: attachmentUrls,
+            created_at: newOrder.createdAt,
+            updated_at: newOrder.updatedAt
+        });
+
+        if (error) {
+            showToast('提交失败: ' + error.message, 'error');
+            return;
+        }
+
+        showToast('工单提交成功！', 'success');
+        // 重置表单
+        document.getElementById('requestForm')?.reset();
+        uploadedFiles = [];
+        renderFileList();
+        // 生成新工单号
+        document.getElementById('orderIdInput').value = await generateOrderId();
+        updatePendingBadge();
+        // 清除错误样式
+        document.querySelectorAll('.form-group.error').forEach(el => el.classList.remove('error'));
     }
 
-    async function saveServiceInfo(orderId) {
-        const record = document.getElementById('afterSalesRecord-'+orderId).value.trim();
-        const solution = document.getElementById('afterSalesSolution-'+orderId).value.trim();
-        if(!record || !solution) { showToast('请填写完整','error'); return; }
-        try {
-            await updateOrderById(orderId, { afterSalesRecord: record, afterSalesSolution: solution, status: 'completed' });
-            showToast('保存成功','success');
-            updatePendingBadge();
-        } catch(e) { showToast('保存失败','error'); }
+    // ================== Tab 切换 ==================
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+        if (tabId === 'tab-list') renderOrderList();
+        if (tabId === 'tab-service') {
+            document.getElementById('serviceResult').innerHTML = '';
+            document.getElementById('serviceEmpty').style.display = 'block';
+        }
     }
-    window.saveServiceInfo = saveServiceInfo;
+    window.switchTab = switchTab;
 
-    // 工单列表
+    // ================== 工单列表 ==================
     async function renderOrderList() {
         const orders = await getAllOrders();
-        const statusFilter = document.getElementById('statusFilter').value;
-        const searchText = document.getElementById('listSearchInput').value.toLowerCase();
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('listSearchInput').value.toLowerCase();
         let filtered = orders;
-        if(statusFilter !== 'all') filtered = filtered.filter(o => o.status === statusFilter);
-        if(searchText) filtered = filtered.filter(o => o.id.includes(searchText) || o.hospitalName.includes(searchText) || o.deviceName.includes(searchText));
+        if (status !== 'all') filtered = filtered.filter(o => o.status === status);
+        if (search) filtered = filtered.filter(o => o.id.includes(search) || o.hospitalName.toLowerCase().includes(search));
         const container = document.getElementById('orderListContainer');
-        if(filtered.length === 0) {
-            container.innerHTML = '<div class="empty-state"><span style="font-size:3rem;">📭</span><p>暂无工单</p></div>';
+        if (filtered.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
         } else {
             container.innerHTML = filtered.map(o => `
                 <div class="order-item" onclick="openDetailModal('${o.id}')">
-                    <span class="order-id">📋 ${o.id}</span>
-                    <div class="order-info"><div class="hospital">🏥 ${o.hospitalName}</div><div class="device">🔧 ${o.deviceName} (${o.deviceModel})</div></div>
-                    <span class="status-badge status-${o.status}"><span class="status-dot ${o.status}"></span>${o.status==='pending'?'待处理':o.status==='processing'?'处理中':'已完成'}</span>
-                    <span class="order-date">${new Date(o.createdAt).toLocaleDateString()}</span>
+                    <span class="order-id">${o.id}</span>
+                    <div class="order-info">
+                        <div class="hospital">${o.hospitalName}</div>
+                        <div class="device">${o.deviceName} / ${o.deviceModel}</div>
+                    </div>
+                    <span class="status-badge status-${o.status}">${o.status==='pending'?'待处理':o.status==='processing'?'处理中':'已完成'}</span>
                 </div>
             `).join('');
         }
@@ -559,76 +498,117 @@
     async function updatePendingBadge() {
         const orders = await getAllOrders();
         const count = orders.filter(o => o.status === 'pending').length;
-        document.getElementById('pendingBadge').textContent = count || '';
+        const badge = document.getElementById('pendingBadge');
+        badge.textContent = count || '';
+        badge.className = count ? 'tab-badge show' : 'tab-badge';
     }
 
-    // 详情弹窗
+    // ================== 售后处理 ==================
+    async function searchOrder() {
+        const orderId = document.getElementById('searchOrderId').value.trim();
+        if (!orderId) return;
+        const orders = await getAllOrders();
+        const order = orders.find(o => o.id === orderId);
+        const resultDiv = document.getElementById('serviceResult');
+        const emptyDiv = document.getElementById('serviceEmpty');
+        if (!order) {
+            resultDiv.innerHTML = '';
+            emptyDiv.style.display = 'block';
+            emptyDiv.innerHTML = '<p>未找到工单</p>';
+            return;
+        }
+        emptyDiv.style.display = 'none';
+        resultDiv.innerHTML = `
+            <div style="margin-bottom:12px;"><strong>${order.id}</strong> | ${order.hospitalName} | ${order.deviceName}</div>
+            <div class="form-group full"><label>售后核实记录</label><textarea class="form-textarea" id="record-${order.id}">${order.afterSalesRecord||''}</textarea></div>
+            <div class="form-group full"><label>售后处理方案</label><textarea class="form-textarea" id="solution-${order.id}">${order.afterSalesSolution||''}</textarea></div>
+            <button class="btn btn-primary" onclick="saveService('${order.id}')">保存</button>
+        `;
+    }
+    window.searchOrder = searchOrder;
+
+    async function saveService(orderId) {
+        const record = document.getElementById(`record-${orderId}`).value;
+        const solution = document.getElementById(`solution-${orderId}`).value;
+        if (!record || !solution) { showToast('请完整填写', 'error'); return; }
+        const { error } = await supabase.from('workorders').update({
+            after_sales_record: record,
+            after_sales_solution: solution,
+            status: 'completed',
+            updated_at: new Date().toISOString()
+        }).eq('id', orderId);
+        if (error) { showToast('保存失败', 'error'); return; }
+        showToast('保存成功', 'success');
+        searchOrder(); // 刷新
+        updatePendingBadge();
+    }
+    window.saveService = saveService;
+
+    // ================== 工单详情弹窗 ==================
     async function openDetailModal(orderId) {
         const orders = await getAllOrders();
         const order = orders.find(o => o.id === orderId);
-        if(!order) return;
-        document.getElementById('detailModalBody').innerHTML = `
-            <p><strong>工单号：</strong>${order.id}</p>
-            <p><strong>状态：</strong>${order.status}</p>
+        if (!order) return;
+        const attHtml = order.attachments?.length ? order.attachments.map(url => {
+            const isVideo = url.match(/\.(mp4|avi|mov)/i);
+            return isVideo ? `<video src="${url}" controls style="max-width:100%;max-height:200px;"></video>` : `<img src="${url}" style="max-width:100%;max-height:200px;">`;
+        }).join('') : '无附件';
+        document.getElementById('detailModalContent').innerHTML = `
+            <h3>工单详情 - ${order.id}</h3>
+            <p><strong>公司：</strong>${order.companyName}</p>
             <p><strong>医院：</strong>${order.hospitalName}</p>
+            <p><strong>地址：</strong>${order.hospitalAddress||'无'}</p>
+            <p><strong>反馈人：</strong>${order.feedbackName} / ${order.feedbackPhone}</p>
+            <p><strong>客户：</strong>${order.customerName} / ${order.customerPhone}</p>
             <p><strong>设备：</strong>${order.deviceName} / ${order.deviceModel} / ${order.snNumber}</p>
             <p><strong>异常描述：</strong>${order.faultDescription}</p>
+            <p><strong>附件：</strong></p><div>${attHtml}</div>
             <p><strong>售后核实：</strong>${order.afterSalesRecord||'未填写'}</p>
             <p><strong>处理方案：</strong>${order.afterSalesSolution||'未填写'}</p>
-        `;
-        document.getElementById('detailModalFooter').innerHTML = `
-            <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${order.id}')">🗑️ 删除</button>
-            <button class="btn btn-outline btn-sm" onclick="closeDetailModal()">关闭</button>
+            <button class="btn btn-ghost" onclick="closeDetailModal()">关闭</button>
         `;
         document.getElementById('detailModal').style.display = 'flex';
     }
-    window.openDetailModal = openDetailModal;
     function closeDetailModal() { document.getElementById('detailModal').style.display = 'none'; }
+    window.openDetailModal = openDetailModal;
     window.closeDetailModal = closeDetailModal;
-    async function deleteOrder(id) {
-        if(confirm('确认删除工单 '+id+'？')) {
-            await deleteOrderById(id);
-            closeDetailModal();
-            renderOrderList();
-            showToast('已删除','info');
-        }
-    }
-    window.deleteOrder = deleteOrder;
 
-    // 二维码
+    // ================== 二维码 ==================
     function showQRCode() {
         const url = window.location.href;
+        document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
         document.getElementById('qrUrlDisplay').textContent = url;
-        document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
         document.getElementById('qrModal').style.display = 'flex';
     }
-    window.showQRCode = showQRCode;
     function closeQRModal() { document.getElementById('qrModal').style.display = 'none'; }
-    window.closeQRModal = closeQRModal;
     function copyCurrentURL() {
-        navigator.clipboard.writeText(window.location.href).then(() => alert('链接已复制！'));
+        navigator.clipboard.writeText(window.location.href).then(() => showToast('链接已复制','info'));
     }
+    window.showQRCode = showQRCode;
+    window.closeQRModal = closeQRModal;
+    window.copyCurrentURL = copyCurrentURL;
 
-    // CSV导出
+    // ================== 导出CSV ==================
     async function exportCSV() {
         const orders = await getAllOrders();
+        if (orders.length === 0) { showToast('没有数据可导出', 'info'); return; }
         let csv = '工单号,状态,公司,医院,设备,型号,SN,异常描述,售后核实,处理方案\n';
         orders.forEach(o => {
-            csv += `"${o.id}","${o.status}","${o.companyName}","${o.hospitalName}","${o.deviceName}","${o.deviceModel}","${o.snNumber}","${o.faultDescription}","${o.afterSalesRecord}","${o.afterSalesSolution}"\n`;
+            csv += `"${o.id}","${o.status}","${o.companyName}","${o.hospitalName}","${o.deviceName}","${o.deviceModel}","${o.snNumber}","${o.faultDescription}","${o.afterSalesRecord||''}","${o.afterSalesSolution||''}"\n`;
         });
         const blob = new Blob(['\uFEFF'+csv], {type: 'text/csv'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = '工单导出.csv';
+        a.download = `工单_${new Date().toISOString().slice(0,10)}.csv`;
         a.click();
+        showToast('导出成功','success');
     }
     window.exportCSV = exportCSV;
 
-    // 初始化
-    (async function init() {
-        await updatePendingBadge();
+    // ================== 初始化 ==================
+    (async function() {
+        updatePendingBadge();
         renderOrderList();
-        console.log('✅ 系统已启动，Supabase 连接正常');
     })();
 </script>
 </body>
