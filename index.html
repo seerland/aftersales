@@ -4,48 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>售后处理需求单系统</title>
-    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- SheetJS (用于导出Excel) -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
-            --primary: #1a6fb5; --primary-dark: #155a8f; --primary-light: #e8f4fb;
-            --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+            --primary: #1a6fb5; --primary-dark: #155a8f; --danger: #ef4444;
             --bg: #f0f4f8; --card-bg: #ffffff; --text: #1e293b; --text-secondary: #64748b;
-            --border: #e2e8f0; --radius: 12px; --radius-sm: 8px;
+            --border: #e2e8f0; --radius: 12px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
             background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh;
-            padding-bottom: env(safe-area-inset-bottom);
+            padding-bottom: 20px;
         }
         .header {
             background: var(--card-bg); border-bottom: 1px solid var(--border);
             padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
-            flex-wrap: wrap; gap: 8px; position: sticky; top: 0; z-index: 100;
+            flex-wrap: wrap; gap: 8px;
         }
         .header-left { display: flex; align-items: center; gap: 10px; }
         .header-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--primary);
             display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
         .header-title { font-size: 1rem; font-weight: 700; }
-        .header-right { display: flex; align-items: center; gap: 10px; }
-        .order-id-box {
-            background: #f0f7ff; border: 1px solid var(--primary); border-radius: 6px;
-            padding: 4px 8px; font-family: monospace; font-weight: 700; color: var(--primary);
-            font-size: 0.85rem; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .order-id-box input {
-            border: none; background: transparent; font-family: inherit; font-weight: inherit;
-            color: inherit; font-size: inherit; width: 110px; outline: none; text-align: right;
-        }
         .btn {
             display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px;
             border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
             border: 1px solid transparent; background: #fff; transition: all 0.2s; white-space: nowrap;
         }
-        .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-primary { background: var(--primary); color: #fff; }
         .btn-outline { background: #fff; color: var(--primary); border-color: var(--primary); }
         .btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
         .container { max-width: 900px; margin: 0 auto; padding: 12px 12px 30px; }
@@ -58,7 +45,7 @@
             border-radius: 9px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
             color: var(--text-secondary); transition: all 0.2s; white-space: nowrap;
         }
-        .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .tab-badge {
             background: var(--danger); color: #fff; font-size: 0.65rem; padding: 2px 6px;
             border-radius: 10px; margin-left: 4px; display: none;
@@ -68,7 +55,21 @@
         .tab-content.active { display: block; }
         .card {
             background: var(--card-bg); border-radius: var(--radius); padding: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 12px; border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 12px; border: 1px solid var(--border);
+        }
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+            flex-wrap: wrap; gap: 8px;
+        }
+        .card-header h3 { margin: 0; }
+        .order-id-mini {
+            background: #f0f7ff; border: 1px solid var(--primary); border-radius: 6px;
+            padding: 4px 8px; font-family: monospace; font-weight: 700; color: var(--primary);
+            font-size: 0.85rem; display: flex; align-items: center; gap: 4px;
+        }
+        .order-id-mini input {
+            border: none; background: transparent; font-family: inherit; font-weight: inherit;
+            color: inherit; font-size: inherit; width: 105px; outline: none; text-align: right;
         }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
@@ -83,8 +84,6 @@
         }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); background: #fff; }
         .form-textarea { resize: vertical; min-height: 80px; }
-        .form-error { font-size: 0.7rem; color: var(--danger); display: none; }
-        .form-group.error .form-input { border-color: var(--danger); background: #fff5f5; }
         .attach-area {
             border: 1.5px dashed var(--border); border-radius: 8px; padding: 12px;
             text-align: center; cursor: pointer; background: #fafcfd; margin-top: 8px;
@@ -92,7 +91,7 @@
         }
         .attach-area:hover { border-color: var(--primary); background: #f0f7ff; }
         .attach-list { font-size: 0.8rem; margin-top: 6px; }
-        .attach-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+        .attach-item { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
         .attach-item .remove { color: var(--danger); cursor: pointer; font-weight: bold; margin-left: auto; }
         .order-list { display: flex; flex-direction: column; gap: 8px; }
         .order-item {
@@ -101,8 +100,6 @@
         }
         .order-id { font-family: monospace; font-weight: 700; color: var(--primary); min-width: 100px; }
         .order-info { flex: 1; }
-        .order-info .hospital { font-weight: 600; font-size: 0.85rem; }
-        .order-info .device { font-size: 0.73rem; color: var(--text-secondary); }
         .status-badge {
             display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
             border-radius: 12px; font-size: 0.7rem; font-weight: 600;
@@ -125,20 +122,22 @@
         }
         .toast-success { background: #059669; } .toast-error { background: #dc2626; } .toast-info { background: #2563eb; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        .db-warning {
+            background: #fff5f5; border: 1px solid var(--danger); color: var(--danger);
+            padding: 10px; border-radius: 8px; margin-bottom: 12px; text-align: center;
+            font-weight: 500; font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
 
-<!-- ==================== Header ==================== -->
+<!-- Header -->
 <header class="header">
     <div class="header-left">
         <div class="header-logo">🔧</div>
         <div class="header-title">售后处理需求单系统</div>
     </div>
-    <div class="header-right">
-        <div class="order-id-box" title="工单号可修改">
-            📋 <input type="text" id="orderIdDisplay" value="加载中...">
-        </div>
+    <div>
         <button class="btn btn-ghost btn-sm" onclick="showQRCode()">📱 二维码</button>
         <button class="btn btn-outline btn-sm" onclick="exportToExcel()">📥 导出Excel</button>
     </div>
@@ -147,19 +146,27 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
-    <!-- Tab导航 -->
+    <!-- 数据库未配置警告，默认隐藏 -->
+    <div id="dbWarning" class="db-warning" style="display:none;"></div>
+
+    <!-- Tab 导航 -->
     <nav class="tabs-nav">
-        <button class="tab-btn active" data-tab="tab-request" onclick="switchTab('tab-request')">📝 需求提交</button>
-        <button class="tab-btn" data-tab="tab-service" onclick="switchTab('tab-service')">🔍 售后处理</button>
-        <button class="tab-btn" data-tab="tab-list" onclick="switchTab('tab-list')" id="tabListBtn">
+        <button class="tab-btn active" onclick="switchTab('tab-request')">📝 需求提交</button>
+        <button class="tab-btn" onclick="switchTab('tab-service')">🔍 售后处理</button>
+        <button class="tab-btn" onclick="switchTab('tab-list')" id="tabListBtn">
             📋 工单列表 <span class="tab-badge" id="pendingBadge"></span>
         </button>
     </nav>
 
-    <!-- 需求提交 -->
+    <!-- 需求提交 Tab -->
     <div class="tab-content active" id="tab-request">
         <div class="card">
-            <h3 style="margin-bottom:12px;">提交售后需求</h3>
+            <div class="card-header">
+                <h3>提交售后需求</h3>
+                <div class="order-id-mini">
+                    📋 <input type="text" id="orderIdDisplay" value="加载中..." title="工单号可手动修改">
+                </div>
+            </div>
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label"><span class="required-star">*</span> 公司名称</label>
@@ -207,7 +214,7 @@
                 </div>
                 <div class="form-group full">
                     <label class="form-label"><span class="required-star">*</span> 现场异常情况描述</label>
-                    <textarea class="form-textarea" id="faultDescription" placeholder="详细描述现场故障信息..." style="margin-bottom:0;"></textarea>
+                    <textarea class="form-textarea" id="faultDescription" placeholder="详细描述现场故障信息..."></textarea>
                     <div class="attach-area" id="attachBox">
                         <p style="margin:0;">📎 点击上传图片/视频（可拖拽）</p>
                         <input type="file" id="fileInput" accept="image/*,video/*" multiple style="display:none;">
@@ -215,11 +222,13 @@
                     <div class="attach-list" id="attachList"></div>
                 </div>
             </div>
-            <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center;" id="submitBtn">✅ 提交需求单</button>
+            <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center;" id="submitBtn">
+                ✅ 提交需求单
+            </button>
         </div>
     </div>
 
-    <!-- 售后处理 -->
+    <!-- 售后处理 Tab -->
     <div class="tab-content" id="tab-service">
         <div class="card">
             <h3 style="margin-bottom:12px;">查找工单并处理</h3>
@@ -232,7 +241,7 @@
         </div>
     </div>
 
-    <!-- 工单列表 -->
+    <!-- 工单列表 Tab -->
     <div class="tab-content" id="tab-list">
         <div class="card">
             <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -253,7 +262,7 @@
 <div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
     <div class="modal-dialog" style="text-align:center;">
         <h3>📱 扫码访问系统</h3>
-        <img id="qrImage" style="width:180px;height:180px;margin:10px auto;">
+        <img id="qrImage" style="width:180px;height:180px;margin:10px auto;" alt="二维码">
         <p id="qrUrlDisplay" style="word-break:break-all;font-size:0.8rem;color:var(--text-secondary);"></p>
         <button class="btn btn-outline btn-sm" onclick="copyCurrentURL()">复制链接</button>
         <button class="btn btn-ghost btn-sm" onclick="closeQRModal()">关闭</button>
@@ -266,13 +275,32 @@
 </div>
 
 <script>
-    // ===================== 配置（请替换为你自己的） =====================
-    const SUPABASE_URL = 'https://your-project.supabase.co';   // 你的URL
-    const SUPABASE_ANON_KEY = 'your-anon-key';                // 你的anon key
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ===================== 配置（必须替换为你的真实值） =====================
+const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
+    let supabase = null;
+    let dbConfigured = false;
+
+    // 初始化 Supabase，并检查配置是否有效
+    function initSupabase() {
+        if (!SUPABASE_URL.includes('your-project') && !SUPABASE_ANON_KEY.includes('your-anon-key')) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            dbConfigured = true;
+            document.getElementById('dbWarning').style.display = 'none';
+            return true;
+        } else {
+            document.getElementById('dbWarning').style.display = 'block';
+            document.getElementById('dbWarning').innerText = '⚠️ 检测到 Supabase 未配置，请先替换代码中的 SUPABASE_URL 和 SUPABASE_ANON_KEY 为您自己的值。数据操作功能暂不可用。';
+            dbConfigured = false;
+            return false;
+        }
+    }
+
+    // 调用初始化
+    initSupabase();
 
     // ===================== 全局变量 =====================
-    let pendingFiles = []; // 待上传文件
+    let pendingFiles = [];
 
     // ===================== 工具函数 =====================
     function showToast(msg, type='info') {
@@ -284,25 +312,50 @@
         setTimeout(() => div.remove(), 3000);
     }
 
-    // 获取所有工单
+    // 切换 Tab
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        if (tabId === 'tab-list' && dbConfigured) renderOrderList();
+        if (tabId === 'tab-service') {
+            document.getElementById('serviceResult').innerHTML = '';
+            document.getElementById('serviceEmpty').style.display = 'block';
+        }
+    }
+    window.switchTab = switchTab;
+
+    // ===================== 数据库操作（所有操作前检查 dbConfigured） =====================
     async function getAllOrders() {
+        if (!dbConfigured) { showToast('数据库未配置', 'error'); return []; }
         const { data, error } = await supabase.from('workorders').select('*').order('created_at', { ascending: false });
-        if (error) { console.error(error); return []; }
-        return data.map(o => ({
-            id: o.id, companyName: o.company_name, hospitalName: o.hospital_name,
-            hospitalAddress: o.hospital_address, feedbackName: o.feedback_name,
-            feedbackPhone: o.feedback_phone, customerName: o.customer_name,
-            customerPhone: o.customer_phone, deviceName: o.device_name,
-            deviceModel: o.device_model, snNumber: o.sn_number,
-            manufacturer: o.manufacturer || '',
-            faultDescription: o.fault_description, afterSalesRecord: o.after_sales_record,
-            afterSalesSolution: o.after_sales_solution, status: o.status,
-            attachments: o.attachments || [], createdAt: o.created_at, updatedAt: o.updated_at
+        if (error) { showToast('获取数据失败: ' + error.message, 'error'); return []; }
+        return data.map(order => ({
+            id: order.id,
+            companyName: order.company_name,
+            hospitalName: order.hospital_name,
+            hospitalAddress: order.hospital_address || '',
+            feedbackName: order.feedback_name,
+            feedbackPhone: order.feedback_phone,
+            customerName: order.customer_name,
+            customerPhone: order.customer_phone,
+            deviceName: order.device_name,
+            deviceModel: order.device_model,
+            snNumber: order.sn_number,
+            manufacturer: order.manufacturer || '',
+            faultDescription: order.fault_description,
+            afterSalesRecord: order.after_sales_record || '',
+            afterSalesSolution: order.after_sales_solution || '',
+            status: order.status,
+            attachments: order.attachments || [],
+            createdAt: order.created_at,
+            updatedAt: order.updated_at
         }));
     }
 
-    // 生成工单号（年月日+序号）
     async function generateOrderId() {
+        if (!dbConfigured) return 'YYYYMMDD001';
         const now = new Date();
         const prefix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
         const orders = await getAllOrders();
@@ -312,26 +365,12 @@
         return prefix + String(maxSeq+1).padStart(3,'0');
     }
 
-    // 初始化工单号（页面加载后显示在右上角）
     async function refreshOrderIdDisplay() {
         const id = await generateOrderId();
         document.getElementById('orderIdDisplay').value = id;
     }
+    // 页面加载时生成工单号
     refreshOrderIdDisplay();
-
-    // ===================== Tab切换 =====================
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
-        if (tabId === 'tab-list') renderOrderList();
-        if (tabId === 'tab-service') {
-            document.getElementById('serviceResult').innerHTML = '';
-            document.getElementById('serviceEmpty').style.display = 'block';
-        }
-    }
-    window.switchTab = switchTab;
 
     // ===================== 附件处理 =====================
     const fileInput = document.getElementById('fileInput');
@@ -378,6 +417,7 @@
 
     async function uploadFiles(orderId) {
         if (pendingFiles.length === 0) return [];
+        if (!dbConfigured) { showToast('数据库未配置，无法上传', 'error'); return []; }
         const urls = [];
         for (let file of pendingFiles) {
             const fileName = `${orderId}/${Date.now()}_${file.name}`;
@@ -392,8 +432,12 @@
         return urls;
     }
 
-    // ===================== 表单提交 =====================
+    // ===================== 提交表单 =====================
     document.getElementById('submitBtn').addEventListener('click', async () => {
+        if (!dbConfigured) {
+            showToast('请先配置 Supabase 数据库连接', 'error');
+            return;
+        }
         // 简单验证
         const required = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
         let valid = true;
@@ -410,13 +454,20 @@
 
         const orderId = document.getElementById('orderIdDisplay').value.trim();
         if (!orderId) { showToast('工单号不能为空', 'error'); return; }
+
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '⏳ 提交中...';
+
+        // 检查工单号是否重复
         const existing = await getAllOrders();
         if (existing.some(o => o.id === orderId)) {
             showToast('工单号已存在，请修改', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✅ 提交需求单';
             return;
         }
 
-        // 上传附件
         const attachmentUrls = await uploadFiles(orderId);
 
         const newOrder = {
@@ -444,22 +495,27 @@
         const { error } = await supabase.from('workorders').insert(newOrder);
         if (error) {
             showToast('提交失败: ' + error.message, 'error');
-            return;
+        } else {
+            showToast('工单提交成功！', 'success');
+            // 重置表单
+            document.querySelectorAll('#tab-request .form-input, #tab-request .form-textarea').forEach(el => el.value = '');
+            document.getElementById('companyName').value = '';
+            document.querySelectorAll('#tab-request .form-group.error').forEach(el => el.classList.remove('error'));
+            pendingFiles = [];
+            renderAttachList();
+            refreshOrderIdDisplay();
+            updatePendingBadge();
         }
-
-        showToast('工单提交成功！', 'success');
-        // 重置表单
-        document.querySelectorAll('#tab-request .form-input, #tab-request .form-textarea').forEach(el => el.value = '');
-        document.getElementById('companyName').value = '';
-        document.querySelectorAll('#tab-request .form-group.error').forEach(el => el.classList.remove('error'));
-        pendingFiles = [];
-        renderAttachList();
-        refreshOrderIdDisplay();
-        updatePendingBadge();
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✅ 提交需求单';
     });
 
     // ===================== 工单列表 =====================
     async function renderOrderList() {
+        if (!dbConfigured) {
+            document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">数据库未连接</p>';
+            return;
+        }
         const orders = await getAllOrders();
         const status = document.getElementById('statusFilter').value;
         const search = document.getElementById('listSearchInput').value.toLowerCase();
@@ -483,17 +539,20 @@
         }
         updatePendingBadge();
     }
+    window.renderOrderList = renderOrderList;
+
     async function updatePendingBadge() {
+        if (!dbConfigured) return;
         const orders = await getAllOrders();
         const count = orders.filter(o => o.status === 'pending').length;
         const badge = document.getElementById('pendingBadge');
         badge.textContent = count || '';
         badge.className = count ? 'tab-badge show' : 'tab-badge';
     }
-    window.renderOrderList = renderOrderList;
 
     // ===================== 售后处理 =====================
     async function searchOrder() {
+        if (!dbConfigured) { showToast('数据库未配置', 'error'); return; }
         const orderId = document.getElementById('searchOrderId').value.trim();
         if (!orderId) return;
         const orders = await getAllOrders();
@@ -517,6 +576,7 @@
     window.searchOrder = searchOrder;
 
     async function saveService(orderId) {
+        if (!dbConfigured) return;
         const record = document.getElementById(`record-${orderId}`).value;
         const solution = document.getElementById(`solution-${orderId}`).value;
         if (!record || !solution) { showToast('请完整填写', 'error'); return; }
@@ -535,6 +595,7 @@
 
     // ===================== 工单详情弹窗 =====================
     async function openDetailModal(orderId) {
+        if (!dbConfigured) return;
         const orders = await getAllOrders();
         const order = orders.find(o => o.id === orderId);
         if (!order) return;
@@ -578,8 +639,9 @@
     window.closeQRModal = closeQRModal;
     window.copyCurrentURL = copyCurrentURL;
 
-    // ===================== 导出Excel =====================
+    // ===================== 导出 Excel =====================
     async function exportToExcel() {
+        if (!dbConfigured) { showToast('数据库未配置，无法导出', 'error'); return; }
         const orders = await getAllOrders();
         if (orders.length === 0) { showToast('没有数据可导出', 'info'); return; }
         const worksheet = XLSX.utils.json_to_sheet(orders.map(o => ({
@@ -599,7 +661,6 @@
             '异常描述': o.faultDescription,
             '售后核实': o.afterSalesRecord,
             '处理方案': o.afterSalesSolution,
-            '创建时间': o.createdAt,
         })));
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, '工单列表');
@@ -610,8 +671,10 @@
 
     // ===================== 初始化 =====================
     (async function() {
-        updatePendingBadge();
-        renderOrderList();
+        if (dbConfigured) {
+            updatePendingBadge();
+            renderOrderList();
+        }
         // 默认显示需求提交
         switchTab('tab-request');
     })();
