@@ -8,7 +8,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
-            --primary: #1a6fb5; --primary-dark: #155a8f; --danger: #ef4444;
+            --primary: #1a6fb5; --danger: #ef4444;
             --bg: #f0f4f8; --card-bg: #ffffff; --text: #1e293b; --text-secondary: #64748b;
             --border: #e2e8f0; --radius: 12px;
         }
@@ -122,16 +122,10 @@
         }
         .toast-success { background: #059669; } .toast-error { background: #dc2626; } .toast-info { background: #2563eb; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
-        .db-warning {
-            background: #fff5f5; border: 1px solid var(--danger); color: var(--danger);
-            padding: 10px; border-radius: 8px; margin-bottom: 12px; text-align: center;
-            font-weight: 500; font-size: 0.85rem;
-        }
     </style>
 </head>
 <body>
 
-<!-- Header -->
 <header class="header">
     <div class="header-left">
         <div class="header-logo">🔧</div>
@@ -146,7 +140,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
-    <!-- Tab 导航 -->
     <nav class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab('tab-request')">📝 需求提交</button>
         <button class="tab-btn" onclick="switchTab('tab-service')">🔍 售后处理</button>
@@ -155,7 +148,6 @@
         </button>
     </nav>
 
-    <!-- 需求提交 Tab -->
     <div class="tab-content active" id="tab-request">
         <div class="card">
             <div class="card-header">
@@ -225,7 +217,6 @@
         </div>
     </div>
 
-    <!-- 售后处理 Tab -->
     <div class="tab-content" id="tab-service">
         <div class="card">
             <h3 style="margin-bottom:12px;">查找工单并处理</h3>
@@ -238,7 +229,6 @@
         </div>
     </div>
 
-    <!-- 工单列表 Tab -->
     <div class="tab-content" id="tab-list">
         <div class="card">
             <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -255,7 +245,6 @@
     </div>
 </div>
 
-<!-- 二维码弹窗 -->
 <div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
     <div class="modal-dialog" style="text-align:center;">
         <h3>📱 扫码访问系统</h3>
@@ -266,36 +255,31 @@
     </div>
 </div>
 
-<!-- 工单详情弹窗 -->
 <div class="modal-overlay" id="detailModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
     <div class="modal-dialog" id="detailModalContent"></div>
 </div>
 
 <script>
-    // ===================== 你的 Supabase 配置（已填入） =====================
+    // ===================== 配置（已填入，无需修改） =====================
     const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
 
-    let supabase = null;
+    // 重命名变量，避免与外部库可能存在的全局 supabase 冲突
+    let supabaseClient = null;
     let dbConfigured = false;
 
-    // 初始化 Supabase
     function initSupabase() {
         try {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             dbConfigured = true;
-            document.getElementById('dbWarning')?.remove();
         } catch (e) {
-            dbConfigured = false;
             console.error('Supabase 初始化失败:', e);
         }
     }
     initSupabase();
 
-    // ===================== 全局变量 =====================
     let pendingFiles = [];
 
-    // ===================== 工具函数 =====================
     function showToast(msg, type='info') {
         const container = document.getElementById('toastContainer');
         const div = document.createElement('div');
@@ -319,31 +303,30 @@
     }
     window.switchTab = switchTab;
 
-    // ===================== 数据库操作 =====================
     async function getAllOrders() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return []; }
-        const { data, error } = await supabase.from('workorders').select('*').order('created_at', { ascending: false });
+        const { data, error } = await supabaseClient.from('workorders').select('*').order('created_at', { ascending: false });
         if (error) { showToast('获取数据失败', 'error'); return []; }
-        return data.map(order => ({
-            id: order.id,
-            companyName: order.company_name,
-            hospitalName: order.hospital_name,
-            hospitalAddress: order.hospital_address || '',
-            feedbackName: order.feedback_name,
-            feedbackPhone: order.feedback_phone,
-            customerName: order.customer_name,
-            customerPhone: order.customer_phone,
-            deviceName: order.device_name,
-            deviceModel: order.device_model,
-            snNumber: order.sn_number,
-            manufacturer: order.manufacturer || '',
-            faultDescription: order.fault_description,
-            afterSalesRecord: order.after_sales_record || '',
-            afterSalesSolution: order.after_sales_solution || '',
-            status: order.status,
-            attachments: order.attachments || [],
-            createdAt: order.created_at,
-            updatedAt: order.updated_at
+        return data.map(o => ({
+            id: o.id,
+            companyName: o.company_name,
+            hospitalName: o.hospital_name,
+            hospitalAddress: o.hospital_address || '',
+            feedbackName: o.feedback_name,
+            feedbackPhone: o.feedback_phone,
+            customerName: o.customer_name,
+            customerPhone: o.customer_phone,
+            deviceName: o.device_name,
+            deviceModel: o.device_model,
+            snNumber: o.sn_number,
+            manufacturer: o.manufacturer || '',
+            faultDescription: o.fault_description,
+            afterSalesRecord: o.after_sales_record || '',
+            afterSalesSolution: o.after_sales_solution || '',
+            status: o.status,
+            attachments: o.attachments || [],
+            createdAt: o.created_at,
+            updatedAt: o.updated_at
         }));
     }
 
@@ -364,20 +347,19 @@
     }
     refreshOrderIdDisplay();
 
-    // ===================== 附件处理 =====================
     const fileInput = document.getElementById('fileInput');
     const attachBox = document.getElementById('attachBox');
     const attachList = document.getElementById('attachList');
 
     attachBox.addEventListener('click', () => fileInput.click());
-    attachBox.addEventListener('dragover', (e) => { e.preventDefault(); attachBox.style.borderColor = 'var(--primary)'; });
+    attachBox.addEventListener('dragover', e => { e.preventDefault(); attachBox.style.borderColor = 'var(--primary)'; });
     attachBox.addEventListener('dragleave', () => attachBox.style.borderColor = 'var(--border)');
-    attachBox.addEventListener('drop', (e) => {
+    attachBox.addEventListener('drop', e => {
         e.preventDefault();
         attachBox.style.borderColor = 'var(--border)';
         handleFiles(e.dataTransfer.files);
     });
-    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
     function handleFiles(files) {
         for (let file of files) {
@@ -402,32 +384,31 @@
             </div>
         `).join('');
     }
-    window.removeFile = function(idx) {
+    window.removeFile = idx => {
         pendingFiles.splice(idx, 1);
         renderAttachList();
     };
 
     async function uploadFiles(orderId) {
         if (pendingFiles.length === 0) return [];
-        if (!dbConfigured) { showToast('数据库未配置，无法上传', 'error'); return []; }
+        if (!dbConfigured) { showToast('数据库未配置', 'error'); return []; }
         const urls = [];
         for (let file of pendingFiles) {
             const fileName = `${orderId}/${Date.now()}_${file.name}`;
-            const { error } = await supabase.storage.from('attachments').upload(fileName, file);
+            const { error } = await supabaseClient.storage.from('attachments').upload(fileName, file);
             if (error) {
                 showToast(`上传失败: ${file.name}`, 'error');
                 continue;
             }
-            const { data } = supabase.storage.from('attachments').getPublicUrl(fileName);
+            const { data } = supabaseClient.storage.from('attachments').getPublicUrl(fileName);
             urls.push(data.publicUrl);
         }
         return urls;
     }
 
-    // ===================== 提交表单 =====================
     document.getElementById('submitBtn').addEventListener('click', async () => {
         if (!dbConfigured) {
-            showToast('数据库未连接，请检查配置', 'error');
+            showToast('数据库未连接', 'error');
             return;
         }
         const required = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
@@ -482,7 +463,7 @@
             updated_at: new Date().toISOString()
         };
 
-        const { error } = await supabase.from('workorders').insert(newOrder);
+        const { error } = await supabaseClient.from('workorders').insert(newOrder);
         if (error) {
             showToast('提交失败: ' + error.message, 'error');
         } else {
@@ -499,7 +480,6 @@
         submitBtn.textContent = '✅ 提交需求单';
     });
 
-    // ===================== 工单列表 =====================
     async function renderOrderList() {
         if (!dbConfigured) {
             document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">数据库未连接</p>';
@@ -539,7 +519,6 @@
         badge.className = count ? 'tab-badge show' : 'tab-badge';
     }
 
-    // ===================== 售后处理 =====================
     async function searchOrder() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const orderId = document.getElementById('searchOrderId').value.trim();
@@ -569,7 +548,7 @@
         const record = document.getElementById(`record-${orderId}`).value;
         const solution = document.getElementById(`solution-${orderId}`).value;
         if (!record || !solution) { showToast('请完整填写', 'error'); return; }
-        const { error } = await supabase.from('workorders').update({
+        const { error } = await supabaseClient.from('workorders').update({
             after_sales_record: record,
             after_sales_solution: solution,
             status: 'completed',
@@ -582,7 +561,6 @@
     }
     window.saveService = saveService;
 
-    // ===================== 工单详情 =====================
     async function openDetailModal(orderId) {
         if (!dbConfigured) return;
         const orders = await getAllOrders();
@@ -613,7 +591,6 @@
     window.openDetailModal = openDetailModal;
     window.closeDetailModal = closeDetailModal;
 
-    // ===================== 二维码 =====================
     function showQRCode() {
         const url = window.location.href;
         document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
@@ -628,28 +605,19 @@
     window.closeQRModal = closeQRModal;
     window.copyCurrentURL = copyCurrentURL;
 
-    // ===================== 导出 Excel =====================
     async function exportToExcel() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const orders = await getAllOrders();
         if (orders.length === 0) { showToast('没有数据可导出', 'info'); return; }
         const worksheet = XLSX.utils.json_to_sheet(orders.map(o => ({
-            '工单号': o.id,
-            '状态': o.status,
-            '公司': o.companyName,
-            '医院': o.hospitalName,
-            '地址': o.hospitalAddress,
-            '反馈人': o.feedbackName,
-            '反馈人电话': o.feedbackPhone,
-            '客户': o.customerName,
-            '客户电话': o.customerPhone,
-            '设备名称': o.deviceName,
-            '型号': o.deviceModel,
-            'SN': o.snNumber,
-            '厂家': o.manufacturer,
+            '工单号': o.id, '状态': o.status, '公司': o.companyName,
+            '医院': o.hospitalName, '地址': o.hospitalAddress,
+            '反馈人': o.feedbackName, '反馈人电话': o.feedbackPhone,
+            '客户': o.customerName, '客户电话': o.customerPhone,
+            '设备名称': o.deviceName, '型号': o.deviceModel,
+            'SN': o.snNumber, '厂家': o.manufacturer,
             '异常描述': o.faultDescription,
-            '售后核实': o.afterSalesRecord,
-            '处理方案': o.afterSalesSolution,
+            '售后核实': o.afterSalesRecord, '处理方案': o.afterSalesSolution
         })));
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, '工单列表');
@@ -658,13 +626,11 @@
     }
     window.exportToExcel = exportToExcel;
 
-    // ===================== 初始化 =====================
     (async function() {
         if (dbConfigured) {
             await updatePendingBadge();
             await renderOrderList();
         }
-        // 确保默认显示需求提交
         switchTab('tab-request');
     })();
 </script>
