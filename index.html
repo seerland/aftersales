@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>售后处理需求单系统</title>
+    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SheetJS (用于导出Excel) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary: #1a6fb5; --primary-dark: #155a8f; --primary-light: #e8f4fb;
@@ -20,16 +23,23 @@
         }
         .header {
             background: var(--card-bg); border-bottom: 1px solid var(--border);
-            padding: 12px 16px; position: sticky; top: 0; z-index: 100;
-            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+            padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 8px; position: sticky; top: 0; z-index: 100;
         }
         .header-left { display: flex; align-items: center; gap: 10px; }
-        .header-logo {
-            width: 36px; height: 36px; border-radius: 10px; background: var(--primary);
-            display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px;
-        }
+        .header-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--primary);
+            display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
         .header-title { font-size: 1rem; font-weight: 700; }
-        .header-subtitle { font-size: 0.7rem; color: var(--text-secondary); }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .order-id-box {
+            background: #f0f7ff; border: 1px solid var(--primary); border-radius: 6px;
+            padding: 4px 8px; font-family: monospace; font-weight: 700; color: var(--primary);
+            font-size: 0.85rem; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .order-id-box input {
+            border: none; background: transparent; font-family: inherit; font-weight: inherit;
+            color: inherit; font-size: inherit; width: 110px; outline: none; text-align: right;
+        }
         .btn {
             display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px;
             border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
@@ -38,11 +48,10 @@
         .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
         .btn-outline { background: #fff; color: var(--primary); border-color: var(--primary); }
         .btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
-        .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
         .container { max-width: 900px; margin: 0 auto; padding: 12px 12px 30px; }
         .tabs-nav {
             display: flex; background: var(--card-bg); border-radius: var(--radius);
-            padding: 4px; margin-bottom: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+            padding: 4px; margin-bottom: 12px; overflow-x: auto;
         }
         .tab-btn {
             flex: 1 0 auto; padding: 10px 14px; border: none; background: transparent;
@@ -76,14 +85,15 @@
         .form-textarea { resize: vertical; min-height: 80px; }
         .form-error { font-size: 0.7rem; color: var(--danger); display: none; }
         .form-group.error .form-input { border-color: var(--danger); background: #fff5f5; }
-        .file-upload-area {
-            border: 1.5px dashed var(--border); border-radius: 8px; padding: 16px;
-            text-align: center; cursor: pointer; background: #fafcfd; transition: all 0.2s;
+        .attach-area {
+            border: 1.5px dashed var(--border); border-radius: 8px; padding: 12px;
+            text-align: center; cursor: pointer; background: #fafcfd; margin-top: 8px;
+            transition: border-color 0.2s;
         }
-        .file-upload-area:hover { border-color: var(--primary); background: #f0f7ff; }
-        .file-list { margin-top: 8px; font-size: 0.8rem; }
-        .file-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
-        .file-item .remove-file { color: var(--danger); cursor: pointer; font-weight: bold; margin-left: auto; }
+        .attach-area:hover { border-color: var(--primary); background: #f0f7ff; }
+        .attach-list { font-size: 0.8rem; margin-top: 6px; }
+        .attach-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+        .attach-item .remove { color: var(--danger); cursor: pointer; font-weight: bold; margin-left: auto; }
         .order-list { display: flex; flex-direction: column; gap: 8px; }
         .order-item {
             background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
@@ -118,156 +128,153 @@
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="header-left">
-            <div class="header-logo">🔧</div>
-            <div>
-                <div class="header-title">售后处理需求单系统</div>
-                <div class="header-subtitle">扫码提交 · 云端同步</div>
-            </div>
+
+<!-- ==================== Header ==================== -->
+<header class="header">
+    <div class="header-left">
+        <div class="header-logo">🔧</div>
+        <div class="header-title">售后处理需求单系统</div>
+    </div>
+    <div class="header-right">
+        <div class="order-id-box" title="工单号可修改">
+            📋 <input type="text" id="orderIdDisplay" value="加载中...">
         </div>
-        <div>
-            <button class="btn btn-ghost btn-sm" onclick="showQRCode()">📱 二维码入口</button>
-            <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 导出CSV</button>
-        </div>
-    </header>
+        <button class="btn btn-ghost btn-sm" onclick="showQRCode()">📱 二维码</button>
+        <button class="btn btn-outline btn-sm" onclick="exportToExcel()">📥 导出Excel</button>
+    </div>
+</header>
 
-    <div class="toast-container" id="toastContainer"></div>
+<div class="toast-container" id="toastContainer"></div>
 
-    <div class="container">
-        <nav class="tabs-nav">
-            <button class="tab-btn active" data-tab="tab-request" onclick="switchTab('tab-request')">📝 需求提交</button>
-            <button class="tab-btn" data-tab="tab-service" onclick="switchTab('tab-service')">🔍 售后处理</button>
-            <button class="tab-btn" data-tab="tab-list" onclick="switchTab('tab-list')" id="tabListBtn">📋 工单列表 <span class="tab-badge" id="pendingBadge"></span></button>
-        </nav>
+<div class="container">
+    <!-- Tab导航 -->
+    <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="tab-request" onclick="switchTab('tab-request')">📝 需求提交</button>
+        <button class="tab-btn" data-tab="tab-service" onclick="switchTab('tab-service')">🔍 售后处理</button>
+        <button class="tab-btn" data-tab="tab-list" onclick="switchTab('tab-list')" id="tabListBtn">
+            📋 工单列表 <span class="tab-badge" id="pendingBadge"></span>
+        </button>
+    </nav>
 
-        <!-- 需求提交 -->
-        <div class="tab-content active" id="tab-request">
-            <div class="card">
-                <h3 style="margin-bottom:12px;">提交售后需求</h3>
-                <div class="form-grid">
-                    <div class="form-group full" id="orderIdGroup">
-                        <label class="form-label">工单号 <span style="font-size:0.7rem;">(自动生成，可修改)</span></label>
-                        <input type="text" class="form-input" id="orderIdInput" style="font-family:monospace;font-weight:bold;" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> 公司名称</label>
-                        <select class="form-select" id="companyName" required>
-                            <option value="">请选择</option>
-                            <option value="数智">数智</option>
-                            <option value="粉蓝">粉蓝</option>
-                            <option value="明理">明理</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> 医院名称</label>
-                        <input type="text" class="form-input" id="hospitalName" placeholder="医院全称" required>
-                    </div>
-                    <div class="form-group full">
-                        <label class="form-label">医院地址 <span class="optional-tag">选填</span></label>
-                        <input type="text" class="form-input" id="hospitalAddress" placeholder="用于快递寄收">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> 反馈人姓名</label>
-                        <input type="text" class="form-input" id="feedbackName" placeholder="销售/实施/商务">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> 反馈人联系方式</label>
-                        <input type="tel" class="form-input" id="feedbackPhone" placeholder="手机号码">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> 客户姓名</label>
-                        <input type="text" class="form-input" id="customerName" placeholder="客户姓名">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> 客户联系方式</label>
-                        <input type="tel" class="form-input" id="customerPhone" placeholder="客户联系方式">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> 设备名称</label>
-                        <input type="text" class="form-input" id="deviceName" placeholder="故障设备名称">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> 型号</label>
-                        <input type="text" class="form-input" id="deviceModel" placeholder="设备型号">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span class="required-star">*</span> SN号</label>
-                        <input type="text" class="form-input" id="snNumber" placeholder="设备序列号">
-                    </div>
-                    <div class="form-group full">
-                        <label class="form-label"><span class="required-star">*</span> 现场异常情况描述</label>
-                        <textarea class="form-textarea" id="faultDescription" placeholder="详细描述现场故障信息..."></textarea>
-                    </div>
-                    <div class="form-group full">
-                        <label class="form-label">附件 <span class="optional-tag">图片/视频</span></label>
-                        <div class="file-upload-area" id="fileDropArea">
-                            <p>📎 点击或拖拽上传（图片/视频）</p>
-                            <input type="file" id="fileInput" accept="image/*,video/*" multiple style="display:none;">
-                        </div>
-                        <div class="file-list" id="fileList"></div>
-                    </div>
+    <!-- 需求提交 -->
+    <div class="tab-content active" id="tab-request">
+        <div class="card">
+            <h3 style="margin-bottom:12px;">提交售后需求</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> 公司名称</label>
+                    <select class="form-select" id="companyName"><option value="">请选择</option><option value="数智">数智</option><option value="粉蓝">粉蓝</option><option value="明理">明理</option></select>
                 </div>
-                <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center;" onclick="submitRequest()">✅ 提交需求单</button>
-            </div>
-        </div>
-
-        <!-- 售后处理 -->
-        <div class="tab-content" id="tab-service">
-            <div class="card">
-                <h3 style="margin-bottom:12px;">查找工单并处理</h3>
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                    <input type="text" class="form-input" id="searchOrderId" placeholder="输入工单号" style="flex:1;">
-                    <button class="btn btn-primary" onclick="searchOrder()">查找</button>
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> 医院名称</label>
+                    <input type="text" class="form-input" id="hospitalName" placeholder="医院全称">
                 </div>
-                <div id="serviceResult"></div>
-                <div id="serviceEmpty" style="color:var(--text-secondary);text-align:center;">请输入工单号查找</div>
-            </div>
-        </div>
-
-        <!-- 工单列表 -->
-        <div class="tab-content" id="tab-list">
-            <div class="card">
-                <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-                    <select class="form-select" id="statusFilter" onchange="renderOrderList()" style="width:auto;">
-                        <option value="all">全部状态</option>
-                        <option value="pending">待处理</option>
-                        <option value="processing">处理中</option>
-                        <option value="completed">已完成</option>
-                    </select>
-                    <input type="text" class="form-input" id="listSearchInput" placeholder="搜索工单号/医院" oninput="renderOrderList()" style="flex:1;">
+                <div class="form-group full">
+                    <label class="form-label">医院地址 <span class="optional-tag">选填</span></label>
+                    <input type="text" class="form-input" id="hospitalAddress" placeholder="用于快递寄收">
                 </div>
-                <div class="order-list" id="orderListContainer"></div>
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> 反馈人姓名</label>
+                    <input type="text" class="form-input" id="feedbackName" placeholder="销售/实施/商务">
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> 反馈人联系方式</label>
+                    <input type="tel" class="form-input" id="feedbackPhone" placeholder="手机号码">
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> 客户姓名</label>
+                    <input type="text" class="form-input" id="customerName" placeholder="客户姓名">
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> 客户联系方式</label>
+                    <input type="tel" class="form-input" id="customerPhone" placeholder="客户联系方式">
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> 设备名称</label>
+                    <input type="text" class="form-input" id="deviceName" placeholder="故障设备名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> 型号</label>
+                    <input type="text" class="form-input" id="deviceModel" placeholder="设备型号">
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><span class="required-star">*</span> SN号</label>
+                    <input type="text" class="form-input" id="snNumber" placeholder="设备序列号">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">厂家名称</label>
+                    <input type="text" class="form-input" id="manufacturer" placeholder="设备厂家">
+                </div>
+                <div class="form-group full">
+                    <label class="form-label"><span class="required-star">*</span> 现场异常情况描述</label>
+                    <textarea class="form-textarea" id="faultDescription" placeholder="详细描述现场故障信息..." style="margin-bottom:0;"></textarea>
+                    <div class="attach-area" id="attachBox">
+                        <p style="margin:0;">📎 点击上传图片/视频（可拖拽）</p>
+                        <input type="file" id="fileInput" accept="image/*,video/*" multiple style="display:none;">
+                    </div>
+                    <div class="attach-list" id="attachList"></div>
+                </div>
             </div>
+            <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center;" id="submitBtn">✅ 提交需求单</button>
         </div>
     </div>
 
-    <!-- 二维码弹窗 -->
-    <div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
-        <div class="modal-dialog" style="text-align:center;">
-            <h3>📱 扫码访问系统</h3>
-            <img id="qrImage" style="width:180px;height:180px;margin:10px auto;">
-            <p id="qrUrlDisplay" style="word-break:break-all;font-size:0.8rem;color:var(--text-secondary);"></p>
-            <button class="btn btn-outline btn-sm" onclick="copyCurrentURL()">复制链接</button>
-            <button class="btn btn-ghost btn-sm" onclick="closeQRModal()">关闭</button>
+    <!-- 售后处理 -->
+    <div class="tab-content" id="tab-service">
+        <div class="card">
+            <h3 style="margin-bottom:12px;">查找工单并处理</h3>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <input type="text" class="form-input" id="searchOrderId" placeholder="输入工单号" style="flex:1;">
+                <button class="btn btn-primary" onclick="searchOrder()">查找</button>
+            </div>
+            <div id="serviceResult"></div>
+            <div id="serviceEmpty" style="color:var(--text-secondary);text-align:center;">请输入工单号查找</div>
         </div>
     </div>
 
-    <!-- 工单详情弹窗 -->
-    <div class="modal-overlay" id="detailModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
-        <div class="modal-dialog" id="detailModalContent"></div>
+    <!-- 工单列表 -->
+    <div class="tab-content" id="tab-list">
+        <div class="card">
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                <select class="form-select" id="statusFilter" onchange="renderOrderList()" style="width:auto;">
+                    <option value="all">全部状态</option>
+                    <option value="pending">待处理</option>
+                    <option value="processing">处理中</option>
+                    <option value="completed">已完成</option>
+                </select>
+                <input type="text" class="form-input" id="listSearchInput" placeholder="搜索工单号/医院" oninput="renderOrderList()" style="flex:1;">
+            </div>
+            <div class="order-list" id="orderListContainer"></div>
+        </div>
     </div>
+</div>
+
+<!-- 二维码弹窗 -->
+<div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
+    <div class="modal-dialog" style="text-align:center;">
+        <h3>📱 扫码访问系统</h3>
+        <img id="qrImage" style="width:180px;height:180px;margin:10px auto;">
+        <p id="qrUrlDisplay" style="word-break:break-all;font-size:0.8rem;color:var(--text-secondary);"></p>
+        <button class="btn btn-outline btn-sm" onclick="copyCurrentURL()">复制链接</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeQRModal()">关闭</button>
+    </div>
+</div>
+
+<!-- 工单详情弹窗 -->
+<div class="modal-overlay" id="detailModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
+    <div class="modal-dialog" id="detailModalContent"></div>
+</div>
 
 <script>
-    // ================== 配置（已由用户替换） ==================
+    // ===================== 配置（请替换为你自己的） =====================
     const SUPABASE_URL = 'https://your-project.supabase.co';   // 你的URL
     const SUPABASE_ANON_KEY = 'your-anon-key';                // 你的anon key
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ================== 全局变量 ==================
-    let uploadedFiles = []; // 暂存待上传文件对象
+    // ===================== 全局变量 =====================
+    let pendingFiles = []; // 待上传文件
 
-    // ================== 工具函数 ==================
+    // ===================== 工具函数 =====================
     function showToast(msg, type='info') {
         const container = document.getElementById('toastContainer');
         const div = document.createElement('div');
@@ -277,6 +284,7 @@
         setTimeout(() => div.remove(), 3000);
     }
 
+    // 获取所有工单
     async function getAllOrders() {
         const { data, error } = await supabase.from('workorders').select('*').order('created_at', { ascending: false });
         if (error) { console.error(error); return []; }
@@ -286,12 +294,14 @@
             feedbackPhone: o.feedback_phone, customerName: o.customer_name,
             customerPhone: o.customer_phone, deviceName: o.device_name,
             deviceModel: o.device_model, snNumber: o.sn_number,
+            manufacturer: o.manufacturer || '',
             faultDescription: o.fault_description, afterSalesRecord: o.after_sales_record,
             afterSalesSolution: o.after_sales_solution, status: o.status,
             attachments: o.attachments || [], createdAt: o.created_at, updatedAt: o.updated_at
         }));
     }
 
+    // 生成工单号（年月日+序号）
     async function generateOrderId() {
         const now = new Date();
         const prefix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
@@ -302,159 +312,14 @@
         return prefix + String(maxSeq+1).padStart(3,'0');
     }
 
-    // 初始化工单号显示
-    (async function initOrderId() {
+    // 初始化工单号（页面加载后显示在右上角）
+    async function refreshOrderIdDisplay() {
         const id = await generateOrderId();
-        document.getElementById('orderIdInput').value = id;
-    })();
-
-    // ================== 文件上传处理 ==================
-    const fileInput = document.getElementById('fileInput');
-    const fileDropArea = document.getElementById('fileDropArea');
-    const fileList = document.getElementById('fileList');
-
-    fileDropArea.addEventListener('click', () => fileInput.click());
-    fileDropArea.addEventListener('dragover', (e) => { e.preventDefault(); fileDropArea.style.borderColor = 'var(--primary)'; });
-    fileDropArea.addEventListener('dragleave', () => fileDropArea.style.borderColor = 'var(--border)');
-    fileDropArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        fileDropArea.style.borderColor = 'var(--border)';
-        handleFiles(e.dataTransfer.files);
-    });
-    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
-
-    function handleFiles(files) {
-        for (let file of files) {
-            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-                showToast('仅支持图片和视频文件', 'error');
-                continue;
-            }
-            if (file.size > 50 * 1024 * 1024) {
-                showToast('单个文件不能超过50MB', 'error');
-                continue;
-            }
-            uploadedFiles.push(file);
-        }
-        renderFileList();
+        document.getElementById('orderIdDisplay').value = id;
     }
+    refreshOrderIdDisplay();
 
-    function renderFileList() {
-        fileList.innerHTML = uploadedFiles.map((file, idx) => `
-            <div class="file-item">
-                <span>📄 ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)</span>
-                <span class="remove-file" onclick="removeFile(${idx})">✕</span>
-            </div>
-        `).join('');
-    }
-    window.removeFile = function(idx) {
-        uploadedFiles.splice(idx, 1);
-        renderFileList();
-    };
-
-    async function uploadFiles(orderId) {
-        if (uploadedFiles.length === 0) return [];
-        const urls = [];
-        for (let file of uploadedFiles) {
-            const fileName = `${orderId}/${Date.now()}_${file.name}`;
-            const { error } = await supabase.storage.from('attachments').upload(fileName, file);
-            if (error) {
-                console.error('上传失败:', error);
-                showToast(`文件 ${file.name} 上传失败`, 'error');
-                continue;
-            }
-            const { data } = supabase.storage.from('attachments').getPublicUrl(fileName);
-            urls.push(data.publicUrl);
-        }
-        return urls;
-    }
-
-    // ================== 表单提交 ==================
-    async function submitRequest() {
-        // 简单必填校验
-        const required = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
-        let valid = true;
-        required.forEach(id => {
-            const el = document.getElementById(id);
-            if (!el.value.trim()) {
-                el.closest('.form-group').classList.add('error');
-                valid = false;
-            } else {
-                el.closest('.form-group').classList.remove('error');
-            }
-        });
-        if (!valid) { showToast('请填写所有必填项', 'error'); return; }
-
-        const orderId = document.getElementById('orderIdInput').value.trim();
-        // 检查工单号是否已存在
-        const existing = await getAllOrders();
-        if (existing.some(o => o.id === orderId)) {
-            showToast('工单号已存在，请修改', 'error');
-            return;
-        }
-
-        // 先上传附件
-        const attachmentUrls = await uploadFiles(orderId);
-
-        const newOrder = {
-            id: orderId,
-            companyName: document.getElementById('companyName').value,
-            hospitalName: document.getElementById('hospitalName').value,
-            hospitalAddress: document.getElementById('hospitalAddress').value,
-            feedbackName: document.getElementById('feedbackName').value,
-            feedbackPhone: document.getElementById('feedbackPhone').value,
-            customerName: document.getElementById('customerName').value,
-            customerPhone: document.getElementById('customerPhone').value,
-            deviceName: document.getElementById('deviceName').value,
-            deviceModel: document.getElementById('deviceModel').value,
-            snNumber: document.getElementById('snNumber').value,
-            faultDescription: document.getElementById('faultDescription').value,
-            afterSalesRecord: '',
-            afterSalesSolution: '',
-            status: 'pending',
-            attachments: attachmentUrls,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-
-        const { error } = await supabase.from('workorders').insert({
-            id: newOrder.id,
-            company_name: newOrder.companyName,
-            hospital_name: newOrder.hospitalName,
-            hospital_address: newOrder.hospitalAddress,
-            feedback_name: newOrder.feedbackName,
-            feedback_phone: newOrder.feedbackPhone,
-            customer_name: newOrder.customerName,
-            customer_phone: newOrder.customerPhone,
-            device_name: newOrder.deviceName,
-            device_model: newOrder.deviceModel,
-            sn_number: newOrder.snNumber,
-            fault_description: newOrder.faultDescription,
-            after_sales_record: '',
-            after_sales_solution: '',
-            status: 'pending',
-            attachments: attachmentUrls,
-            created_at: newOrder.createdAt,
-            updated_at: newOrder.updatedAt
-        });
-
-        if (error) {
-            showToast('提交失败: ' + error.message, 'error');
-            return;
-        }
-
-        showToast('工单提交成功！', 'success');
-        // 重置表单
-        document.getElementById('requestForm')?.reset();
-        uploadedFiles = [];
-        renderFileList();
-        // 生成新工单号
-        document.getElementById('orderIdInput').value = await generateOrderId();
-        updatePendingBadge();
-        // 清除错误样式
-        document.querySelectorAll('.form-group.error').forEach(el => el.classList.remove('error'));
-    }
-
-    // ================== Tab 切换 ==================
+    // ===================== Tab切换 =====================
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -468,7 +333,132 @@
     }
     window.switchTab = switchTab;
 
-    // ================== 工单列表 ==================
+    // ===================== 附件处理 =====================
+    const fileInput = document.getElementById('fileInput');
+    const attachBox = document.getElementById('attachBox');
+    const attachList = document.getElementById('attachList');
+
+    attachBox.addEventListener('click', () => fileInput.click());
+    attachBox.addEventListener('dragover', (e) => { e.preventDefault(); attachBox.style.borderColor = 'var(--primary)'; });
+    attachBox.addEventListener('dragleave', () => attachBox.style.borderColor = 'var(--border)');
+    attachBox.addEventListener('drop', (e) => {
+        e.preventDefault();
+        attachBox.style.borderColor = 'var(--border)';
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    function handleFiles(files) {
+        for (let file of files) {
+            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+                showToast('仅支持图片和视频', 'error');
+                continue;
+            }
+            if (file.size > 50 * 1024 * 1024) {
+                showToast('文件不能超过50MB', 'error');
+                continue;
+            }
+            pendingFiles.push(file);
+        }
+        renderAttachList();
+    }
+
+    function renderAttachList() {
+        attachList.innerHTML = pendingFiles.map((file, idx) => `
+            <div class="attach-item">
+                <span>📄 ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)</span>
+                <span class="remove" onclick="removeFile(${idx})">✕</span>
+            </div>
+        `).join('');
+    }
+    window.removeFile = function(idx) {
+        pendingFiles.splice(idx, 1);
+        renderAttachList();
+    };
+
+    async function uploadFiles(orderId) {
+        if (pendingFiles.length === 0) return [];
+        const urls = [];
+        for (let file of pendingFiles) {
+            const fileName = `${orderId}/${Date.now()}_${file.name}`;
+            const { error } = await supabase.storage.from('attachments').upload(fileName, file);
+            if (error) {
+                showToast(`上传失败: ${file.name}`, 'error');
+                continue;
+            }
+            const { data } = supabase.storage.from('attachments').getPublicUrl(fileName);
+            urls.push(data.publicUrl);
+        }
+        return urls;
+    }
+
+    // ===================== 表单提交 =====================
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+        // 简单验证
+        const required = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
+        let valid = true;
+        required.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el.value.trim()) {
+                el.closest('.form-group').classList.add('error');
+                valid = false;
+            } else {
+                el.closest('.form-group').classList.remove('error');
+            }
+        });
+        if (!valid) { showToast('请填写所有必填项', 'error'); return; }
+
+        const orderId = document.getElementById('orderIdDisplay').value.trim();
+        if (!orderId) { showToast('工单号不能为空', 'error'); return; }
+        const existing = await getAllOrders();
+        if (existing.some(o => o.id === orderId)) {
+            showToast('工单号已存在，请修改', 'error');
+            return;
+        }
+
+        // 上传附件
+        const attachmentUrls = await uploadFiles(orderId);
+
+        const newOrder = {
+            id: orderId,
+            company_name: document.getElementById('companyName').value,
+            hospital_name: document.getElementById('hospitalName').value,
+            hospital_address: document.getElementById('hospitalAddress').value,
+            feedback_name: document.getElementById('feedbackName').value,
+            feedback_phone: document.getElementById('feedbackPhone').value,
+            customer_name: document.getElementById('customerName').value,
+            customer_phone: document.getElementById('customerPhone').value,
+            device_name: document.getElementById('deviceName').value,
+            device_model: document.getElementById('deviceModel').value,
+            sn_number: document.getElementById('snNumber').value,
+            manufacturer: document.getElementById('manufacturer').value,
+            fault_description: document.getElementById('faultDescription').value,
+            after_sales_record: '',
+            after_sales_solution: '',
+            status: 'pending',
+            attachments: attachmentUrls,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase.from('workorders').insert(newOrder);
+        if (error) {
+            showToast('提交失败: ' + error.message, 'error');
+            return;
+        }
+
+        showToast('工单提交成功！', 'success');
+        // 重置表单
+        document.querySelectorAll('#tab-request .form-input, #tab-request .form-textarea').forEach(el => el.value = '');
+        document.getElementById('companyName').value = '';
+        document.querySelectorAll('#tab-request .form-group.error').forEach(el => el.classList.remove('error'));
+        pendingFiles = [];
+        renderAttachList();
+        refreshOrderIdDisplay();
+        updatePendingBadge();
+    });
+
+    // ===================== 工单列表 =====================
     async function renderOrderList() {
         const orders = await getAllOrders();
         const status = document.getElementById('statusFilter').value;
@@ -493,8 +483,6 @@
         }
         updatePendingBadge();
     }
-    window.renderOrderList = renderOrderList;
-
     async function updatePendingBadge() {
         const orders = await getAllOrders();
         const count = orders.filter(o => o.status === 'pending').length;
@@ -502,8 +490,9 @@
         badge.textContent = count || '';
         badge.className = count ? 'tab-badge show' : 'tab-badge';
     }
+    window.renderOrderList = renderOrderList;
 
-    // ================== 售后处理 ==================
+    // ===================== 售后处理 =====================
     async function searchOrder() {
         const orderId = document.getElementById('searchOrderId').value.trim();
         if (!orderId) return;
@@ -539,12 +528,12 @@
         }).eq('id', orderId);
         if (error) { showToast('保存失败', 'error'); return; }
         showToast('保存成功', 'success');
-        searchOrder(); // 刷新
+        searchOrder();
         updatePendingBadge();
     }
     window.saveService = saveService;
 
-    // ================== 工单详情弹窗 ==================
+    // ===================== 工单详情弹窗 =====================
     async function openDetailModal(orderId) {
         const orders = await getAllOrders();
         const order = orders.find(o => o.id === orderId);
@@ -561,6 +550,7 @@
             <p><strong>反馈人：</strong>${order.feedbackName} / ${order.feedbackPhone}</p>
             <p><strong>客户：</strong>${order.customerName} / ${order.customerPhone}</p>
             <p><strong>设备：</strong>${order.deviceName} / ${order.deviceModel} / ${order.snNumber}</p>
+            <p><strong>厂家：</strong>${order.manufacturer||'无'}</p>
             <p><strong>异常描述：</strong>${order.faultDescription}</p>
             <p><strong>附件：</strong></p><div>${attHtml}</div>
             <p><strong>售后核实：</strong>${order.afterSalesRecord||'未填写'}</p>
@@ -573,7 +563,7 @@
     window.openDetailModal = openDetailModal;
     window.closeDetailModal = closeDetailModal;
 
-    // ================== 二维码 ==================
+    // ===================== 二维码 =====================
     function showQRCode() {
         const url = window.location.href;
         document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
@@ -588,27 +578,42 @@
     window.closeQRModal = closeQRModal;
     window.copyCurrentURL = copyCurrentURL;
 
-    // ================== 导出CSV ==================
-    async function exportCSV() {
+    // ===================== 导出Excel =====================
+    async function exportToExcel() {
         const orders = await getAllOrders();
         if (orders.length === 0) { showToast('没有数据可导出', 'info'); return; }
-        let csv = '工单号,状态,公司,医院,设备,型号,SN,异常描述,售后核实,处理方案\n';
-        orders.forEach(o => {
-            csv += `"${o.id}","${o.status}","${o.companyName}","${o.hospitalName}","${o.deviceName}","${o.deviceModel}","${o.snNumber}","${o.faultDescription}","${o.afterSalesRecord||''}","${o.afterSalesSolution||''}"\n`;
-        });
-        const blob = new Blob(['\uFEFF'+csv], {type: 'text/csv'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `工单_${new Date().toISOString().slice(0,10)}.csv`;
-        a.click();
-        showToast('导出成功','success');
+        const worksheet = XLSX.utils.json_to_sheet(orders.map(o => ({
+            '工单号': o.id,
+            '状态': o.status,
+            '公司': o.companyName,
+            '医院': o.hospitalName,
+            '地址': o.hospitalAddress,
+            '反馈人': o.feedbackName,
+            '反馈人电话': o.feedbackPhone,
+            '客户': o.customerName,
+            '客户电话': o.customerPhone,
+            '设备名称': o.deviceName,
+            '型号': o.deviceModel,
+            'SN': o.snNumber,
+            '厂家': o.manufacturer,
+            '异常描述': o.faultDescription,
+            '售后核实': o.afterSalesRecord,
+            '处理方案': o.afterSalesSolution,
+            '创建时间': o.createdAt,
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, '工单列表');
+        XLSX.writeFile(workbook, `工单_${new Date().toISOString().slice(0,10)}.xlsx`);
+        showToast('导出成功', 'success');
     }
-    window.exportCSV = exportCSV;
+    window.exportToExcel = exportToExcel;
 
-    // ================== 初始化 ==================
+    // ===================== 初始化 =====================
     (async function() {
         updatePendingBadge();
         renderOrderList();
+        // 默认显示需求提交
+        switchTab('tab-request');
     })();
 </script>
 </body>
