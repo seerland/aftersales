@@ -146,9 +146,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
-    <!-- 数据库未配置警告，默认隐藏 -->
-    <div id="dbWarning" class="db-warning" style="display:none;"></div>
-
     <!-- Tab 导航 -->
     <nav class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab('tab-request')">📝 需求提交</button>
@@ -275,28 +272,24 @@
 </div>
 
 <script>
-    // ===================== 配置（必须替换为你的真实值） =====================
-const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
+    // ===================== 你的 Supabase 配置（已填入） =====================
+    const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
+
     let supabase = null;
     let dbConfigured = false;
 
-    // 初始化 Supabase，并检查配置是否有效
+    // 初始化 Supabase
     function initSupabase() {
-        if (!SUPABASE_URL.includes('your-project') && !SUPABASE_ANON_KEY.includes('your-anon-key')) {
+        try {
             supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             dbConfigured = true;
-            document.getElementById('dbWarning').style.display = 'none';
-            return true;
-        } else {
-            document.getElementById('dbWarning').style.display = 'block';
-            document.getElementById('dbWarning').innerText = '⚠️ 检测到 Supabase 未配置，请先替换代码中的 SUPABASE_URL 和 SUPABASE_ANON_KEY 为您自己的值。数据操作功能暂不可用。';
+            document.getElementById('dbWarning')?.remove();
+        } catch (e) {
             dbConfigured = false;
-            return false;
+            console.error('Supabase 初始化失败:', e);
         }
     }
-
-    // 调用初始化
     initSupabase();
 
     // ===================== 全局变量 =====================
@@ -312,12 +305,12 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
         setTimeout(() => div.remove(), 3000);
     }
 
-    // 切换 Tab
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
-        document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        const btn = document.querySelector(`[onclick="switchTab('${tabId}')"]`);
+        if (btn) btn.classList.add('active');
         if (tabId === 'tab-list' && dbConfigured) renderOrderList();
         if (tabId === 'tab-service') {
             document.getElementById('serviceResult').innerHTML = '';
@@ -326,11 +319,11 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     }
     window.switchTab = switchTab;
 
-    // ===================== 数据库操作（所有操作前检查 dbConfigured） =====================
+    // ===================== 数据库操作 =====================
     async function getAllOrders() {
-        if (!dbConfigured) { showToast('数据库未配置', 'error'); return []; }
+        if (!dbConfigured) { showToast('数据库未连接', 'error'); return []; }
         const { data, error } = await supabase.from('workorders').select('*').order('created_at', { ascending: false });
-        if (error) { showToast('获取数据失败: ' + error.message, 'error'); return []; }
+        if (error) { showToast('获取数据失败', 'error'); return []; }
         return data.map(order => ({
             id: order.id,
             companyName: order.company_name,
@@ -369,7 +362,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
         const id = await generateOrderId();
         document.getElementById('orderIdDisplay').value = id;
     }
-    // 页面加载时生成工单号
     refreshOrderIdDisplay();
 
     // ===================== 附件处理 =====================
@@ -435,10 +427,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     // ===================== 提交表单 =====================
     document.getElementById('submitBtn').addEventListener('click', async () => {
         if (!dbConfigured) {
-            showToast('请先配置 Supabase 数据库连接', 'error');
+            showToast('数据库未连接，请检查配置', 'error');
             return;
         }
-        // 简单验证
         const required = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
         let valid = true;
         required.forEach(id => {
@@ -459,7 +450,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
         submitBtn.disabled = true;
         submitBtn.textContent = '⏳ 提交中...';
 
-        // 检查工单号是否重复
         const existing = await getAllOrders();
         if (existing.some(o => o.id === orderId)) {
             showToast('工单号已存在，请修改', 'error');
@@ -497,7 +487,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
             showToast('提交失败: ' + error.message, 'error');
         } else {
             showToast('工单提交成功！', 'success');
-            // 重置表单
             document.querySelectorAll('#tab-request .form-input, #tab-request .form-textarea').forEach(el => el.value = '');
             document.getElementById('companyName').value = '';
             document.querySelectorAll('#tab-request .form-group.error').forEach(el => el.classList.remove('error'));
@@ -552,7 +541,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
     // ===================== 售后处理 =====================
     async function searchOrder() {
-        if (!dbConfigured) { showToast('数据库未配置', 'error'); return; }
+        if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const orderId = document.getElementById('searchOrderId').value.trim();
         if (!orderId) return;
         const orders = await getAllOrders();
@@ -593,7 +582,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     }
     window.saveService = saveService;
 
-    // ===================== 工单详情弹窗 =====================
+    // ===================== 工单详情 =====================
     async function openDetailModal(orderId) {
         if (!dbConfigured) return;
         const orders = await getAllOrders();
@@ -641,7 +630,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
     // ===================== 导出 Excel =====================
     async function exportToExcel() {
-        if (!dbConfigured) { showToast('数据库未配置，无法导出', 'error'); return; }
+        if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const orders = await getAllOrders();
         if (orders.length === 0) { showToast('没有数据可导出', 'info'); return; }
         const worksheet = XLSX.utils.json_to_sheet(orders.map(o => ({
@@ -672,10 +661,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     // ===================== 初始化 =====================
     (async function() {
         if (dbConfigured) {
-            updatePendingBadge();
-            renderOrderList();
+            await updatePendingBadge();
+            await renderOrderList();
         }
-        // 默认显示需求提交
+        // 确保默认显示需求提交
         switchTab('tab-request');
     })();
 </script>
