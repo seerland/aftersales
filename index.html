@@ -45,7 +45,6 @@
             flex: 1 0 auto; padding: 10px 14px; border: none; background: transparent;
             border-radius: 9px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
             color: var(--text-secondary); transition: all 0.2s; white-space: nowrap;
-            position: relative;
         }
         .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .tab-badge {
@@ -90,8 +89,6 @@
         .order-item.pending-highlight { background: #fff7ed; border-color: #fcd9b8; }
         .order-id { font-family: monospace; font-weight: 700; color: var(--primary); min-width: 100px; }
         .order-info { flex: 1; }
-        .order-info .hospital { font-weight: 600; font-size: 0.85rem; }
-        .order-info .device { font-size: 0.73rem; color: var(--text-secondary); }
         .status-badge {
             display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
             border-radius: 12px; font-size: 0.7rem; font-weight: 600;
@@ -99,8 +96,6 @@
         .status-pending { background: #fff7ed; color: #c2410c; }
         .status-processing { background: #eff6ff; color: #1d4ed8; }
         .status-completed { background: #ecfdf5; color: #065f46; }
-
-        /* 可拖拽弹窗 */
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 200;
             display: flex; align-items: center; justify-content: center; padding: 20px;
@@ -109,22 +104,20 @@
         .modal-dialog {
             background: #fff; border-radius: 16px; width: 100%; max-width: 650px;
             max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            position: relative; border: 1px solid rgba(255,255,255,0.3);
+            border: 1px solid rgba(255,255,255,0.3);
             background: linear-gradient(145deg, #ffffff 0%, #f8fafd 100%);
-            display: flex; flex-direction: column;
         }
         .modal-header-draggable {
             padding: 16px 20px; border-bottom: 1px solid var(--border);
             cursor: move; user-select: none; display: flex; align-items: center;
             justify-content: space-between; background: #fafcfd; border-radius: 16px 16px 0 0;
         }
-        .modal-header-draggable h3 { margin: 0; font-size: 1rem; font-weight: 700; }
         .modal-close-btn {
             width: 32px; height: 32px; border-radius: 50%; border: none;
             background: #f1f5f9; cursor: pointer; font-size: 1.1rem; display: flex;
             align-items: center; justify-content: center; color: var(--text-secondary);
         }
-        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-body { padding: 20px; overflow-y: auto; }
         .modal-footer {
             padding: 14px 20px; border-top: 1px solid var(--border);
             display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
@@ -135,13 +128,11 @@
             border: 2px solid transparent; transition: 0.2s;
         }
         .img-thumb:hover { border-color: var(--primary); }
-        .detail-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;
-        }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; }
         @media (max-width: 480px) { .detail-grid { grid-template-columns: 1fr; } }
         .detail-item { padding: 8px 10px; background: #f8fafc; border-radius: 6px; }
-        .detail-item .detail-label { font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); }
-        .detail-item .detail-value { font-weight: 600; }
+        .detail-label { font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); }
+        .detail-value { font-weight: 600; }
         .toast-container { position: fixed; top: 12px; right: 12px; z-index: 300; display: flex; flex-direction: column; gap: 6px; }
         .toast {
             padding: 10px 14px; border-radius: 6px; color: #fff; font-size: 0.8rem; font-weight: 600;
@@ -149,6 +140,10 @@
         }
         .toast-success { background: #059669; } .toast-error { background: #dc2626; } .toast-info { background: #2563eb; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        .progress-bar {
+            height: 6px; background: #e5e7eb; border-radius: 3px; margin: 8px 0; overflow: hidden;
+        }
+        .progress-bar div { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }
     </style>
 </head>
 <body>
@@ -169,12 +164,11 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
-    <nav class="tabs-nav" id="tabsNav">
+    <nav class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab('tab-request')">📝 需求提交</button>
-        <button class="tab-btn" onclick="switchTab('tab-service')" id="tabServiceBtn" style="display:none;">
-            🔍 售后处理 <span class="tab-badge" id="serviceBadge"></span>
-        </button>
+        <button class="tab-btn" onclick="switchTab('tab-service')" id="tabServiceBtn" style="display:none;">🔍 售后处理 <span class="tab-badge" id="serviceBadge"></span></button>
         <button class="tab-btn" onclick="switchTab('tab-list')" id="tabListBtn" style="display:none;">📋 工单列表</button>
+        <button class="tab-btn" onclick="switchTab('tab-accounts')" id="tabAccountsBtn" style="display:none;">👥 账号管理</button>
     </nav>
 
     <!-- 需求提交 Tab -->
@@ -236,7 +230,7 @@
                     <div class="attach-list" id="attachList"></div>
                 </div>
             </div>
-            <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center;" id="submitBtn">
+            <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center;" id="submitBtn" onclick="submitRequest()">
                 ✅ 提交需求单
             </button>
         </div>
@@ -268,17 +262,45 @@
             <div class="order-list" id="orderListContainer"></div>
         </div>
     </div>
+
+    <!-- 账号管理 Tab（仅管理员可见） -->
+    <div class="tab-content" id="tab-accounts">
+        <div class="card">
+            <h3 style="margin-bottom:12px;">账号管理</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">姓名 / 工号（任填一项）</label>
+                    <input type="text" class="form-input" id="newAccountName" placeholder="姓名或工号">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">密码</label>
+                    <input type="text" class="form-input" id="newAccountPassword" placeholder="登录密码">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">角色</label>
+                    <select class="form-select" id="newAccountRole">
+                        <option value="service">售后人员</option>
+                        <option value="admin">管理员</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn btn-primary mt-2" onclick="addAccount()">➕ 添加账号</button>
+            <hr style="margin:16px 0;">
+            <div class="order-list" id="accountList"></div>
+        </div>
+    </div>
 </div>
 
 <!-- 登录弹窗 -->
 <div class="modal-overlay" id="loginModal" style="display:none;" onclick="if(event.target===this)closeLoginModal()">
     <div class="modal-dialog" style="max-width:360px;">
-        <div class="modal-header-draggable" id="loginDragHandle" style="cursor:default;">
+        <div class="modal-header-draggable">
             <h3>🔐 身份验证</h3>
             <button class="modal-close-btn" onclick="closeLoginModal()">✕</button>
         </div>
         <div class="modal-body">
-            <input type="password" class="form-input" id="passwordInput" placeholder="请输入登录密码" style="margin:10px 0;">
+            <input type="text" class="form-input" id="loginIdentifier" placeholder="姓名/工号（或留空用快速密码）" style="margin-bottom:8px;">
+            <input type="password" class="form-input" id="passwordInput" placeholder="密码">
         </div>
         <div class="modal-footer">
             <button class="btn btn-primary" onclick="doLogin()">登录</button>
@@ -290,7 +312,7 @@
 <!-- 二维码弹窗 -->
 <div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
     <div class="modal-dialog" style="max-width:400px;">
-        <div class="modal-header-draggable" id="qrDragHandle">
+        <div class="modal-header-draggable">
             <h3>📱 扫码访问系统</h3>
             <button class="modal-close-btn" onclick="closeQRModal()">✕</button>
         </div>
@@ -305,11 +327,11 @@
     </div>
 </div>
 
-<!-- 工单详情/编辑弹窗（可拖拽） -->
+<!-- 工单详情弹窗（可拖拽） -->
 <div class="modal-overlay" id="detailModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
     <div class="modal-dialog" id="detailModalDialog">
         <div class="modal-header-draggable" id="detailDragHandle">
-            <h3 id="detailModalTitle">📄 工单详情</h3>
+            <h3>📄 工单详情</h3>
             <button class="modal-close-btn" onclick="closeDetailModal()">✕</button>
         </div>
         <div class="modal-body" id="detailModalBody"></div>
@@ -327,7 +349,9 @@
 
     let supabaseClient = null;
     let dbConfigured = false;
-    let currentRole = 'user';
+    let currentRole = 'user';       // 'user', 'service', 'admin'
+    let currentUser = null;        // 登录的账号信息 { name, employee_id, role }
+
     let pendingFiles = [];
     let afterSalesFiles = {};
 
@@ -352,18 +376,21 @@
     function updateUIByRole() {
         const serviceTab = document.getElementById('tabServiceBtn');
         const listTab = document.getElementById('tabListBtn');
+        const accountsTab = document.getElementById('tabAccountsBtn');
         const loginBtn = document.getElementById('loginBtn');
         const label = document.getElementById('currentRoleLabel');
         if (currentRole === 'user') {
             serviceTab.style.display = 'none';
             listTab.style.display = 'none';
+            accountsTab.style.display = 'none';
             loginBtn.textContent = '🔑 售后登录';
             label.textContent = '当前：访客';
         } else {
             serviceTab.style.display = '';
             listTab.style.display = '';
+            accountsTab.style.display = currentRole === 'admin' ? '' : 'none';
             loginBtn.textContent = '🔑 退出登录';
-            label.textContent = currentRole === 'admin' ? '当前：管理员' : '当前：售后人员';
+            label.textContent = currentUser ? `当前：${currentUser.name || currentUser.employee_id} (${currentRole})` : `当前：${currentRole}`;
         }
         switchTab('tab-request');
     }
@@ -371,47 +398,121 @@
     function showLogin() {
         if (currentRole !== 'user') {
             currentRole = 'user';
+            currentUser = null;
             updateUIByRole();
             showToast('已退出登录');
             return;
         }
+        document.getElementById('loginIdentifier').value = '';
         document.getElementById('passwordInput').value = '';
         document.getElementById('loginModal').style.display = 'flex';
+        document.getElementById('loginIdentifier').focus();
     }
+
     function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
-    function doLogin() {
-        const pwd = document.getElementById('passwordInput').value.trim().toLowerCase();
-        if (pwd === SERVICE_PASSWORD.toLowerCase()) {
+
+    async function doLogin() {
+        const identifier = document.getElementById('loginIdentifier').value.trim();
+        const password = document.getElementById('passwordInput').value.trim().toLowerCase();
+        if (!password) { showToast('请输入密码', 'error'); return; }
+
+        // 优先尝试账号表登录
+        if (identifier) {
+            const { data, error } = await supabaseClient.from('accounts').select('*').or(`name.eq.${identifier},employee_id.eq.${identifier}`);
+            if (!error && data.length > 0) {
+                const account = data[0];
+                if (account.password.toLowerCase() === password) {
+                    currentRole = account.role;
+                    currentUser = account;
+                    closeLoginModal();
+                    updateUIByRole();
+                    renderServiceList(); renderOrderList(); renderAccountList();
+                    showToast('登录成功', 'success');
+                    return;
+                } else {
+                    showToast('密码错误', 'error');
+                    return;
+                }
+            }
+        }
+
+        // 回退到固定密码
+        if (password === SERVICE_PASSWORD.toLowerCase()) {
             currentRole = 'service';
-            showToast('售后人员登录成功', 'success');
-        } else if (pwd === ADMIN_PASSWORD.toLowerCase()) {
+            currentUser = null;
+        } else if (password === ADMIN_PASSWORD.toLowerCase()) {
             currentRole = 'admin';
-            showToast('管理员登录成功', 'success');
+            currentUser = null;
         } else {
-            showToast('密码错误', 'error');
+            showToast('密码错误或账号不存在', 'error');
             return;
         }
         closeLoginModal();
         updateUIByRole();
-        renderServiceList();
-        renderOrderList();
+        renderServiceList(); renderOrderList(); renderAccountList();
+        showToast('登录成功', 'success');
     }
-    window.showLogin = showLogin;
-    window.doLogin = doLogin;
-    window.closeLoginModal = closeLoginModal;
 
-    async function deleteOrder(orderId) {
-        if (currentRole !== 'admin') { showToast('仅管理员可删除', 'error'); return; }
-        if (!confirm('确定永久删除工单 ' + orderId + ' 吗？')) return;
-        const { error } = await supabaseClient.from('workorders').delete().eq('id', orderId);
+    // ===================== 账号管理 =====================
+    async function renderAccountList() {
+        if (currentRole !== 'admin') return;
+        const { data, error } = await supabaseClient.from('accounts').select('*');
+        if (error) { showToast('获取账号列表失败', 'error'); return; }
+        const container = document.getElementById('accountList');
+        container.innerHTML = data.map(acc => `
+            <div class="order-item">
+                <span>${acc.name || acc.employee_id} (${acc.employee_id || '无工号'}) - ${acc.role}</span>
+                <button class="btn btn-danger btn-sm" onclick="deleteAccount(${acc.id})">删除</button>
+            </div>
+        `).join('') || '<p style="color:var(--text-secondary);">暂无账号</p>';
+    }
+
+    async function addAccount() {
+        const name = document.getElementById('newAccountName').value.trim();
+        const password = document.getElementById('newAccountPassword').value.trim();
+        const role = document.getElementById('newAccountRole').value;
+        if (!name || !password) { showToast('请填写姓名/工号及密码', 'error'); return; }
+        const payload = {
+            name: name,
+            employee_id: name,  // 也可用单独字段，这里简化为一致
+            password: password,
+            role: role
+        };
+        const { error } = await supabaseClient.from('accounts').insert(payload);
+        if (error) { showToast('添加失败: ' + error.message, 'error'); return; }
+        showToast('账号添加成功', 'success');
+        document.getElementById('newAccountName').value = '';
+        document.getElementById('newAccountPassword').value = '';
+        renderAccountList();
+    }
+
+    async function deleteAccount(id) {
+        if (!confirm('确认删除该账号？')) return;
+        const { error } = await supabaseClient.from('accounts').delete().eq('id', id);
         if (error) { showToast('删除失败', 'error'); return; }
         showToast('已删除', 'info');
-        closeDetailModal();
-        renderServiceList();
-        renderOrderList();
+        renderAccountList();
     }
 
-    // ===================== 数据获取 =====================
+    // ===================== 回车键支持 =====================
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            // 登录弹窗
+            if (document.getElementById('loginModal').style.display === 'flex') {
+                e.preventDefault();
+                doLogin();
+                return;
+            }
+            // 详情弹窗保存
+            if (document.getElementById('detailModal').style.display === 'flex') {
+                e.preventDefault();
+                const saveBtn = document.querySelector('#detailModalFooter .btn-primary');
+                if (saveBtn) saveBtn.click();
+            }
+        }
+    });
+
+    // ===================== 数据操作 =====================
     async function getAllOrders() {
         if (!dbConfigured) return [];
         const { data, error } = await supabaseClient.from('workorders').select('*').order('created_at', { ascending: false });
@@ -433,6 +534,7 @@
             afterSalesRecord: o.after_sales_record || '',
             afterSalesSolution: o.after_sales_solution || '',
             status: o.status,
+            handler: o.handler || '',
             attachments: o.attachments || [],
             afterSalesAttachments: o.after_sales_attachments || [],
             createdAt: o.created_at,
@@ -453,17 +555,32 @@
         return prefix + String(maxSeq+1).padStart(3,'0');
     }
 
-    // ===================== 附件上传通用 =====================
-    async function uploadFiles(files, orderId, subfolder = '') {
+    // 带进度提示的上传
+    async function uploadFilesWithProgress(files, orderId, subfolder = '') {
         if (files.length === 0) return [];
         const urls = [];
         for (let file of files) {
+            if (file.size > 100 * 1024 * 1024) {
+                showToast(`文件 ${file.name} 超过100MB，已跳过`, 'error');
+                continue;
+            }
             const safeName = `${Date.now()}_${Math.random().toString(36).substring(2,8)}.${file.name.split('.').pop()}`;
             const filePath = `${orderId}${subfolder}/${safeName}`;
-            const { error } = await supabaseClient.storage.from('attachments').upload(filePath, file);
-            if (error) { showToast(`上传失败: ${file.name}`, 'error'); continue; }
-            const { data } = supabaseClient.storage.from('attachments').getPublicUrl(filePath);
-            urls.push(data.publicUrl);
+            // 显示进度条（简化）
+            const progressId = `progress-${Date.now()}`;
+            const progressHTML = `<div class="progress-bar" id="${progressId}"><div></div></div>`;
+            showToast(`上传中: ${file.name} ${progressHTML}`, 'info');
+            try {
+                const { error } = await supabaseClient.storage.from('attachments').upload(filePath, file);
+                if (error) { showToast(`上传失败: ${file.name}`, 'error'); continue; }
+                const { data } = supabaseClient.storage.from('attachments').getPublicUrl(filePath);
+                urls.push(data.publicUrl);
+                // 移除进度条
+                const prog = document.getElementById(progressId);
+                if (prog) prog.parentElement.remove();
+            } catch (err) {
+                showToast(`上传异常: ${file.name}`, 'error');
+            }
         }
         return urls;
     }
@@ -495,7 +612,7 @@
     }
     window.removeRequestFile = idx => { pendingFiles.splice(idx, 1); renderRequestAttachList(); };
 
-    document.getElementById('submitBtn').addEventListener('click', async () => {
+    async function submitRequest() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const required = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
         let valid = true;
@@ -508,7 +625,7 @@
         const submitBtn = document.getElementById('submitBtn');
         submitBtn.disabled = true; submitBtn.textContent = '⏳ 提交中...';
         const orderId = await generateOrderId();
-        const attachmentUrls = await uploadFiles(pendingFiles, orderId, '/request');
+        const attachmentUrls = await uploadFilesWithProgress(pendingFiles, orderId, '/request');
         const newOrder = {
             id: orderId,
             company_name: document.getElementById('companyName').value,
@@ -523,9 +640,13 @@
             sn_number: document.getElementById('snNumber').value,
             manufacturer: document.getElementById('manufacturer').value,
             fault_description: document.getElementById('faultDescription').value,
-            after_sales_record: '', after_sales_solution: '', status: 'pending',
-            attachments: attachmentUrls, after_sales_attachments: [],
-            created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+            after_sales_record: '', after_sales_solution: '',
+            status: 'pending',
+            handler: '',  // 提交时不填处理人
+            attachments: attachmentUrls,
+            after_sales_attachments: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
         const { error } = await supabaseClient.from('workorders').insert(newOrder);
         if (error) { showToast('提交失败: ' + error.message, 'error'); }
@@ -538,33 +659,10 @@
             updateBadges();
         }
         submitBtn.disabled = false; submitBtn.textContent = '✅ 提交需求单';
-    });
-
-    // ===================== 工单列表 =====================
-    async function renderOrderList() {
-        if (!dbConfigured || currentRole === 'user') {
-            document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">无权限</p>';
-            return;
-        }
-        const orders = await getAllOrders();
-        const status = document.getElementById('statusFilter').value;
-        const search = document.getElementById('listSearchInput').value.toLowerCase();
-        let filtered = orders.filter(o => status === 'all' || o.status === status);
-        if (search) filtered = filtered.filter(o => o.id.includes(search) || o.hospitalName.toLowerCase().includes(search));
-        const container = document.getElementById('orderListContainer');
-        if (filtered.length === 0) container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
-        else container.innerHTML = filtered.map(o => {
-            const statusText = o.status==='pending'?'待处理':o.status==='processing'?'处理中':'已完成';
-            return `<div class="order-item" onclick="openDetailModal('${o.id}')">
-                <span class="order-id">${o.id}</span>
-                <div class="order-info"><div class="hospital">${o.hospitalName}</div><div class="device">${o.deviceName} / ${o.deviceModel}</div></div>
-                <span class="status-badge status-${o.status}">${statusText}</span>
-            </div>`;
-        }).join('');
     }
-    window.renderOrderList = renderOrderList;
+    window.submitRequest = submitRequest;
 
-    // ===================== 售后处理 Tab =====================
+    // ===================== 售后处理列表 =====================
     async function renderServiceList() {
         if (!dbConfigured || currentRole === 'user') return;
         const orders = await getAllOrders();
@@ -581,14 +679,35 @@
             const statusText = o.status==='pending'?'待处理':o.status==='processing'?'处理中':'已完成';
             return `<div class="order-item ${isPending ? 'pending-highlight' : ''}">
                 <span class="order-id">${o.id}</span>
-                <div class="order-info"><div class="hospital">${o.hospitalName}</div><div class="device">${o.deviceName} / ${o.deviceModel} | ${o.snNumber}</div></div>
+                <div class="order-info"><div class="hospital">${o.hospitalName}</div><div class="device">${o.deviceName} / ${o.deviceModel} | 处理人: ${o.handler || '未分配'}</div></div>
                 <span class="status-badge status-${o.status}">${statusText}</span>
                 <button class="btn btn-ghost btn-sm" onclick="openDetailModal('${o.id}')">📋 处理</button>
             </div>`;
         }).join('');
         updateBadges();
     }
-    window.renderServiceList = renderServiceList;
+
+    async function renderOrderList() {
+        if (!dbConfigured || currentRole === 'user') {
+            document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">无权限</p>';
+            return;
+        }
+        const orders = await getAllOrders();
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('listSearchInput').value.toLowerCase();
+        let filtered = orders.filter(o => status === 'all' || o.status === status);
+        if (search) filtered = filtered.filter(o => o.id.includes(search) || o.hospitalName.toLowerCase().includes(search));
+        const container = document.getElementById('orderListContainer');
+        if (filtered.length === 0) container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
+        else container.innerHTML = filtered.map(o => {
+            const statusText = o.status==='pending'?'待处理':o.status==='processing'?'处理中':'已完成';
+            return `<div class="order-item" onclick="openDetailModal('${o.id}')">
+                <span class="order-id">${o.id}</span>
+                <div class="order-info"><div class="hospital">${o.hospitalName}</div><div class="device">${o.deviceName} / ${o.deviceModel} | 处理人: ${o.handler || '无'}</div></div>
+                <span class="status-badge status-${o.status}">${statusText}</span>
+            </div>`;
+        }).join('');
+    }
 
     async function updateBadges() {
         if (!dbConfigured) return;
@@ -599,14 +718,13 @@
         serviceBadge.className = pendingCount ? 'tab-badge show' : 'tab-badge';
     }
 
-    // ===================== 工单详情弹窗（可拖拽 + 可编辑） =====================
+    // ===================== 工单详情弹窗 =====================
     async function openDetailModal(orderId) {
         if (!dbConfigured) return;
         const orders = await getAllOrders();
         const order = orders.find(o => o.id === orderId);
         if (!order) return;
 
-        // 构建附件HTML（可点击放大）
         const renderAttachments = (urls) => urls.map(url => {
             const isVideo = url.match(/\.(mp4|avi|mov|webm)/i);
             if (isVideo) {
@@ -631,6 +749,10 @@
             </div>
             <hr style="margin:16px 0;">
             <div class="form-group full">
+                <label class="form-label">🧑‍🔧 处理人</label>
+                <input type="text" class="form-input" id="editHandler-${order.id}" value="${order.handler || (currentUser ? currentUser.name || currentUser.employee_id : '')}">
+            </div>
+            <div class="form-group full">
                 <label class="form-label">🔍 售后核实记录</label>
                 <textarea class="form-textarea" id="editRecord-${order.id}" style="min-height:100px;">${order.afterSalesRecord||''}</textarea>
             </div>
@@ -651,12 +773,12 @@
 
         const footer = document.getElementById('detailModalFooter');
         footer.innerHTML = `
-            <button class="btn btn-primary" onclick="saveDetailEdit('${order.id}')">💾 保存售后信息</button>
-            ${currentRole === 'admin' ? `<button class="btn btn-danger" onclick="deleteOrder('${order.id}')">🗑️ 删除工单</button>` : ''}
+            <button class="btn btn-primary" onclick="saveDetailEdit('${order.id}')">💾 保存</button>
+            ${currentRole === 'admin' ? `<button class="btn btn-danger" onclick="deleteOrder('${order.id}')">🗑️ 删除</button>` : ''}
             <button class="btn btn-ghost" onclick="closeDetailModal()">关闭</button>
         `;
 
-        // 绑定新上传区域
+        // 绑定售后附件上传
         if (!afterSalesFiles[order.id]) afterSalesFiles[order.id] = [];
         const attachBoxEl = document.getElementById(`afterAttachBox-${order.id}`);
         const fileInputEl = document.getElementById(`afterFileInput-${order.id}`);
@@ -692,14 +814,16 @@
     }
 
     async function saveDetailEdit(orderId) {
+        const handler = document.getElementById(`editHandler-${orderId}`).value.trim();
         const record = document.getElementById(`editRecord-${orderId}`).value.trim();
         const solution = document.getElementById(`editSolution-${orderId}`).value.trim();
         if (!record || !solution) { showToast('请完整填写售后记录和方案', 'error'); return; }
         let afterAttachUrls = [];
         if (afterSalesFiles[orderId] && afterSalesFiles[orderId].length > 0) {
-            afterAttachUrls = await uploadFiles(afterSalesFiles[orderId], orderId, '/after');
+            afterAttachUrls = await uploadFilesWithProgress(afterSalesFiles[orderId], orderId, '/after');
         }
         const { error } = await supabaseClient.from('workorders').update({
+            handler: handler,
             after_sales_record: record,
             after_sales_solution: solution,
             after_sales_attachments: afterAttachUrls,
@@ -707,17 +831,27 @@
             updated_at: new Date().toISOString()
         }).eq('id', orderId);
         if (error) { showToast('保存失败: ' + error.message, 'error'); return; }
-        showToast('售后信息保存成功', 'success');
+        showToast('保存成功', 'success');
         afterSalesFiles[orderId] = [];
         closeDetailModal();
-        renderServiceList();
-        renderOrderList();
+        renderServiceList(); renderOrderList();
+        updateBadges();
     }
+
     window.openDetailModal = openDetailModal;
     window.saveDetailEdit = saveDetailEdit;
     window.closeDetailModal = () => { document.getElementById('detailModal').style.display = 'none'; };
+    window.deleteOrder = async (orderId) => {
+        if (currentRole !== 'admin') { showToast('仅管理员可删除', 'error'); return; }
+        if (!confirm('确定删除？')) return;
+        const { error } = await supabaseClient.from('workorders').delete().eq('id', orderId);
+        if (error) { showToast('删除失败', 'error'); return; }
+        showToast('已删除', 'info');
+        closeDetailModal();
+        renderServiceList(); renderOrderList();
+    };
 
-    // ===================== 拖拽功能 =====================
+    // 拖拽功能
     function makeDraggable(dialog, handle) {
         let offsetX, offsetY, isDown = false;
         handle.onmousedown = function(e) {
@@ -741,13 +875,11 @@
         }
     }
 
-    // ===================== 二维码、导出 =====================
     function showQRCode() {
         const url = window.location.href;
         document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
         document.getElementById('qrUrlDisplay').textContent = url;
         document.getElementById('qrModal').style.display = 'flex';
-        makeDraggable(document.querySelector('#qrModal .modal-dialog'), document.getElementById('qrDragHandle'));
     }
     function closeQRModal() { document.getElementById('qrModal').style.display = 'none'; }
     function copyCurrentURL() { navigator.clipboard.writeText(window.location.href).then(() => showToast('链接已复制','info')); }
@@ -765,6 +897,7 @@
             '设备名称': o.deviceName, '型号': o.deviceModel,
             'SN': o.snNumber, '厂家': o.manufacturer,
             '异常描述': o.faultDescription,
+            '处理人': o.handler,
             '售后核实': o.afterSalesRecord, '处理方案': o.afterSalesSolution
         })));
         const workbook = XLSX.utils.book_new();
@@ -774,19 +907,18 @@
     }
     window.exportToExcel = exportToExcel;
 
-    // ===================== Tab 切换 =====================
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         const btn = document.querySelector(`[onclick="switchTab('${tabId}')"]`);
         if (btn) btn.classList.add('active');
-        if (tabId === 'tab-service' && currentRole !== 'user') renderServiceList();
-        if (tabId === 'tab-list' && currentRole !== 'user') renderOrderList();
+        if (tabId === 'tab-service') renderServiceList();
+        if (tabId === 'tab-list') renderOrderList();
+        if (tabId === 'tab-accounts') renderAccountList();
     }
     window.switchTab = switchTab;
 
-    // ===================== 初始化 =====================
     (async function() {
         updateUIByRole();
         if (dbConfigured && currentRole !== 'user') {
