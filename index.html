@@ -260,11 +260,11 @@
 </div>
 
 <script>
-    // ===================== 配置（已填入，无需修改） =====================
+    // ===================== 你的 Supabase 配置（已填入，无需修改） =====================
     const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
 
-    // 重命名变量，避免与外部库可能存在的全局 supabase 冲突
+    // 使用 supabaseClient 避免与全局变量冲突
     let supabaseClient = null;
     let dbConfigured = false;
 
@@ -347,6 +347,7 @@
     }
     refreshOrderIdDisplay();
 
+    // ===================== 附件处理（已修复文件名编码问题） =====================
     const fileInput = document.getElementById('fileInput');
     const attachBox = document.getElementById('attachBox');
     const attachList = document.getElementById('attachList');
@@ -394,18 +395,21 @@
         if (!dbConfigured) { showToast('数据库未配置', 'error'); return []; }
         const urls = [];
         for (let file of pendingFiles) {
-            const fileName = `${orderId}/${Date.now()}_${file.name}`;
-            const { error } = await supabaseClient.storage.from('attachments').upload(fileName, file);
+            // 强制使用安全文件名，避免中文编码导致400错误
+            const safeName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${file.name.split('.').pop()}`;
+            const filePath = `${orderId}/${safeName}`;
+            const { error } = await supabaseClient.storage.from('attachments').upload(filePath, file);
             if (error) {
                 showToast(`上传失败: ${file.name}`, 'error');
                 continue;
             }
-            const { data } = supabaseClient.storage.from('attachments').getPublicUrl(fileName);
+            const { data } = supabaseClient.storage.from('attachments').getPublicUrl(filePath);
             urls.push(data.publicUrl);
         }
         return urls;
     }
 
+    // ===================== 提交表单 =====================
     document.getElementById('submitBtn').addEventListener('click', async () => {
         if (!dbConfigured) {
             showToast('数据库未连接', 'error');
@@ -480,6 +484,7 @@
         submitBtn.textContent = '✅ 提交需求单';
     });
 
+    // ===================== 工单列表 =====================
     async function renderOrderList() {
         if (!dbConfigured) {
             document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">数据库未连接</p>';
@@ -519,6 +524,7 @@
         badge.className = count ? 'tab-badge show' : 'tab-badge';
     }
 
+    // ===================== 售后处理 =====================
     async function searchOrder() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const orderId = document.getElementById('searchOrderId').value.trim();
@@ -561,6 +567,7 @@
     }
     window.saveService = saveService;
 
+    // ===================== 工单详情 =====================
     async function openDetailModal(orderId) {
         if (!dbConfigured) return;
         const orders = await getAllOrders();
@@ -591,6 +598,7 @@
     window.openDetailModal = openDetailModal;
     window.closeDetailModal = closeDetailModal;
 
+    // ===================== 二维码 =====================
     function showQRCode() {
         const url = window.location.href;
         document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
@@ -605,6 +613,7 @@
     window.closeQRModal = closeQRModal;
     window.copyCurrentURL = copyCurrentURL;
 
+    // ===================== 导出 Excel =====================
     async function exportToExcel() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const orders = await getAllOrders();
@@ -626,6 +635,7 @@
     }
     window.exportToExcel = exportToExcel;
 
+    // ===================== 初始化 =====================
     (async function() {
         if (dbConfigured) {
             await updatePendingBadge();
