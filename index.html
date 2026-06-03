@@ -269,12 +269,12 @@
             <h3 style="margin-bottom:12px;">账号管理</h3>
             <div class="form-grid">
                 <div class="form-group">
-                    <label class="form-label">姓名 / 工号（任填一项）</label>
-                    <input type="text" class="form-input" id="newAccountName" placeholder="姓名或工号">
+                    <label class="form-label">姓名</label>
+                    <input type="text" class="form-input" id="newAccountName" placeholder="姓名">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">密码</label>
-                    <input type="text" class="form-input" id="newAccountPassword" placeholder="登录密码">
+                    <label class="form-label">工号</label>
+                    <input type="text" class="form-input" id="newAccountId" placeholder="工号（唯一）">
                 </div>
                 <div class="form-group">
                     <label class="form-label">角色</label>
@@ -291,7 +291,7 @@
     </div>
 </div>
 
-<!-- 登录弹窗 -->
+<!-- 登录弹窗（仅姓名/工号） -->
 <div class="modal-overlay" id="loginModal" style="display:none;" onclick="if(event.target===this)closeLoginModal()">
     <div class="modal-dialog" style="max-width:360px;">
         <div class="modal-header-draggable">
@@ -299,8 +299,7 @@
             <button class="modal-close-btn" onclick="closeLoginModal()">✕</button>
         </div>
         <div class="modal-body">
-            <input type="text" class="form-input" id="loginIdentifier" placeholder="姓名/工号（或留空用快速密码）" style="margin-bottom:8px;">
-            <input type="password" class="form-input" id="passwordInput" placeholder="密码">
+            <input type="text" class="form-input" id="loginIdentifier" placeholder="请输入姓名或工号">
         </div>
         <div class="modal-footer">
             <button class="btn btn-primary" onclick="doLogin()">登录</button>
@@ -344,13 +343,10 @@
     const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
 
-    const SERVICE_PASSWORD = 'seerland';
-    const ADMIN_PASSWORD = 'admin';
-
     let supabaseClient = null;
     let dbConfigured = false;
     let currentRole = 'user';       // 'user', 'service', 'admin'
-    let currentUser = null;        // 登录的账号信息 { name, employee_id, role }
+    let currentUser = null;        // 登录账号信息
 
     let pendingFiles = [];
     let afterSalesFiles = {};
@@ -404,53 +400,43 @@
             return;
         }
         document.getElementById('loginIdentifier').value = '';
-        document.getElementById('passwordInput').value = '';
         document.getElementById('loginModal').style.display = 'flex';
         document.getElementById('loginIdentifier').focus();
     }
 
     function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
 
+    // ===================== 登录逻辑（admin 固定账号，无需密码） =====================
     async function doLogin() {
         const identifier = document.getElementById('loginIdentifier').value.trim();
-        const password = document.getElementById('passwordInput').value.trim().toLowerCase();
-        if (!password) { showToast('请输入密码', 'error'); return; }
+        if (!identifier) { showToast('请输入姓名或工号', 'error'); return; }
 
-        // 优先尝试账号表登录
-        if (identifier) {
-            const { data, error } = await supabaseClient.from('accounts').select('*').or(`name.eq.${identifier},employee_id.eq.${identifier}`);
-            if (!error && data.length > 0) {
-                const account = data[0];
-                if (account.password.toLowerCase() === password) {
-                    currentRole = account.role;
-                    currentUser = account;
-                    closeLoginModal();
-                    updateUIByRole();
-                    renderServiceList(); renderOrderList(); renderAccountList();
-                    showToast('登录成功', 'success');
-                    return;
-                } else {
-                    showToast('密码错误', 'error');
-                    return;
-                }
-            }
-        }
-
-        // 回退到固定密码
-        if (password === SERVICE_PASSWORD.toLowerCase()) {
-            currentRole = 'service';
-            currentUser = null;
-        } else if (password === ADMIN_PASSWORD.toLowerCase()) {
+        // 固定管理员账号：输入 admin 即可获得管理员权限
+        if (identifier.toLowerCase() === 'admin') {
             currentRole = 'admin';
-            currentUser = null;
-        } else {
-            showToast('密码错误或账号不存在', 'error');
+            currentUser = { name: '管理员', employee_id: 'admin', role: 'admin' };
+            closeLoginModal();
+            updateUIByRole();
+            renderServiceList(); renderOrderList(); renderAccountList();
+            showToast('管理员登录成功', 'success');
             return;
         }
-        closeLoginModal();
-        updateUIByRole();
-        renderServiceList(); renderOrderList(); renderAccountList();
-        showToast('登录成功', 'success');
+
+        // 查询 accounts 表
+        const { data: byName } = await supabaseClient.from('accounts').select('*').eq('name', identifier);
+        const { data: byId } = await supabaseClient.from('accounts').select('*').eq('employee_id', identifier);
+        const account = (byName && byName.length > 0) ? byName[0] : (byId && byId.length > 0) ? byId[0] : null;
+
+        if (account) {
+            currentRole = account.role;
+            currentUser = account;
+            closeLoginModal();
+            updateUIByRole();
+            renderServiceList(); renderOrderList(); renderAccountList();
+            showToast('登录成功', 'success');
+        } else {
+            showToast('账号不存在，请联系管理员', 'error');
+        }
     }
 
     // ===================== 账号管理 =====================
@@ -461,7 +447,7 @@
         const container = document.getElementById('accountList');
         container.innerHTML = data.map(acc => `
             <div class="order-item">
-                <span>${acc.name || acc.employee_id} (${acc.employee_id || '无工号'}) - ${acc.role}</span>
+                <span>${acc.name || ''} ${acc.employee_id ? '(' + acc.employee_id + ')' : ''} - ${acc.role}</span>
                 <button class="btn btn-danger btn-sm" onclick="deleteAccount(${acc.id})">删除</button>
             </div>
         `).join('') || '<p style="color:var(--text-secondary);">暂无账号</p>';
@@ -469,20 +455,20 @@
 
     async function addAccount() {
         const name = document.getElementById('newAccountName').value.trim();
-        const password = document.getElementById('newAccountPassword').value.trim();
+        const employeeId = document.getElementById('newAccountId').value.trim();
         const role = document.getElementById('newAccountRole').value;
-        if (!name || !password) { showToast('请填写姓名/工号及密码', 'error'); return; }
+        if (!name && !employeeId) { showToast('姓名和工号至少填一项', 'error'); return; }
         const payload = {
-            name: name,
-            employee_id: name,  // 也可用单独字段，这里简化为一致
-            password: password,
+            name: name || employeeId,
+            employee_id: employeeId || name,
+            password: '', // 不再使用密码
             role: role
         };
         const { error } = await supabaseClient.from('accounts').insert(payload);
         if (error) { showToast('添加失败: ' + error.message, 'error'); return; }
         showToast('账号添加成功', 'success');
         document.getElementById('newAccountName').value = '';
-        document.getElementById('newAccountPassword').value = '';
+        document.getElementById('newAccountId').value = '';
         renderAccountList();
     }
 
@@ -497,13 +483,11 @@
     // ===================== 回车键支持 =====================
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
-            // 登录弹窗
             if (document.getElementById('loginModal').style.display === 'flex') {
                 e.preventDefault();
                 doLogin();
                 return;
             }
-            // 详情弹窗保存
             if (document.getElementById('detailModal').style.display === 'flex') {
                 e.preventDefault();
                 const saveBtn = document.querySelector('#detailModalFooter .btn-primary');
@@ -555,7 +539,6 @@
         return prefix + String(maxSeq+1).padStart(3,'0');
     }
 
-    // 带进度提示的上传
     async function uploadFilesWithProgress(files, orderId, subfolder = '') {
         if (files.length === 0) return [];
         const urls = [];
@@ -566,18 +549,11 @@
             }
             const safeName = `${Date.now()}_${Math.random().toString(36).substring(2,8)}.${file.name.split('.').pop()}`;
             const filePath = `${orderId}${subfolder}/${safeName}`;
-            // 显示进度条（简化）
-            const progressId = `progress-${Date.now()}`;
-            const progressHTML = `<div class="progress-bar" id="${progressId}"><div></div></div>`;
-            showToast(`上传中: ${file.name} ${progressHTML}`, 'info');
             try {
                 const { error } = await supabaseClient.storage.from('attachments').upload(filePath, file);
                 if (error) { showToast(`上传失败: ${file.name}`, 'error'); continue; }
                 const { data } = supabaseClient.storage.from('attachments').getPublicUrl(filePath);
                 urls.push(data.publicUrl);
-                // 移除进度条
-                const prog = document.getElementById(progressId);
-                if (prog) prog.parentElement.remove();
             } catch (err) {
                 showToast(`上传异常: ${file.name}`, 'error');
             }
@@ -642,7 +618,7 @@
             fault_description: document.getElementById('faultDescription').value,
             after_sales_record: '', after_sales_solution: '',
             status: 'pending',
-            handler: '',  // 提交时不填处理人
+            handler: '',
             attachments: attachmentUrls,
             after_sales_attachments: [],
             created_at: new Date().toISOString(),
@@ -662,7 +638,7 @@
     }
     window.submitRequest = submitRequest;
 
-    // ===================== 售后处理列表 =====================
+    // ===================== 列表与标签 =====================
     async function renderServiceList() {
         if (!dbConfigured || currentRole === 'user') return;
         const orders = await getAllOrders();
@@ -778,7 +754,6 @@
             <button class="btn btn-ghost" onclick="closeDetailModal()">关闭</button>
         `;
 
-        // 绑定售后附件上传
         if (!afterSalesFiles[order.id]) afterSalesFiles[order.id] = [];
         const attachBoxEl = document.getElementById(`afterAttachBox-${order.id}`);
         const fileInputEl = document.getElementById(`afterFileInput-${order.id}`);
@@ -851,7 +826,6 @@
         renderServiceList(); renderOrderList();
     };
 
-    // 拖拽功能
     function makeDraggable(dialog, handle) {
         let offsetX, offsetY, isDown = false;
         handle.onmousedown = function(e) {
