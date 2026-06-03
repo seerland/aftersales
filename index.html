@@ -140,10 +140,6 @@
         }
         .toast-success { background: #059669; } .toast-error { background: #dc2626; } .toast-info { background: #2563eb; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
-        .progress-bar {
-            height: 6px; background: #e5e7eb; border-radius: 3px; margin: 8px 0; overflow: hidden;
-        }
-        .progress-bar div { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }
     </style>
 </head>
 <body>
@@ -263,7 +259,7 @@
         </div>
     </div>
 
-    <!-- 账号管理 Tab（仅管理员可见） -->
+    <!-- 账号管理 Tab -->
     <div class="tab-content" id="tab-accounts">
         <div class="card">
             <h3 style="margin-bottom:12px;">账号管理</h3>
@@ -291,7 +287,7 @@
     </div>
 </div>
 
-<!-- 登录弹窗（仅姓名/工号） -->
+<!-- 登录弹窗 -->
 <div class="modal-overlay" id="loginModal" style="display:none;" onclick="if(event.target===this)closeLoginModal()">
     <div class="modal-dialog" style="max-width:360px;">
         <div class="modal-header-draggable">
@@ -326,7 +322,7 @@
     </div>
 </div>
 
-<!-- 工单详情弹窗（可拖拽） -->
+<!-- 工单详情弹窗 -->
 <div class="modal-overlay" id="detailModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
     <div class="modal-dialog" id="detailModalDialog">
         <div class="modal-header-draggable" id="detailDragHandle">
@@ -343,23 +339,24 @@
     const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
 
+    // 全局变量
     let supabaseClient = null;
     let dbConfigured = false;
-    let currentRole = 'user';
-    let currentUser = null;
-
+    let currentRole = 'user';      // 'user' | 'service' | 'admin'
+    let currentUser = null;       // { name, employee_id, role }
     let pendingFiles = [];
     let afterSalesFiles = {};
 
-    function initSupabase() {
-        try {
-            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            dbConfigured = true;
-        } catch (e) { console.error('Supabase init error', e); }
+    // 初始化 Supabase
+    try {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        dbConfigured = true;
+    } catch (e) {
+        console.error('Supabase 初始化失败', e);
     }
-    initSupabase();
 
-    function showToast(msg, type='info') {
+    // ===================== 工具函数 =====================
+    function showToast(msg, type = 'info') {
         const container = document.getElementById('toastContainer');
         const div = document.createElement('div');
         div.className = `toast toast-${type}`;
@@ -368,12 +365,29 @@
         setTimeout(() => div.remove(), 3000);
     }
 
+    // 选项卡切换
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        const btn = document.querySelector(`[onclick="switchTab('${tabId}')"]`);
+        if (btn) btn.classList.add('active');
+
+        if (tabId === 'tab-service' && currentRole !== 'user') renderServiceList();
+        if (tabId === 'tab-list' && currentRole !== 'user') renderOrderList();
+        if (tabId === 'tab-accounts' && currentRole === 'admin') renderAccountList();
+    }
+    // 直接挂到全局
+    window.switchTab = switchTab;
+
+    // ===================== 权限与登录 =====================
     function updateUIByRole() {
         const serviceTab = document.getElementById('tabServiceBtn');
         const listTab = document.getElementById('tabListBtn');
         const accountsTab = document.getElementById('tabAccountsBtn');
         const loginBtn = document.getElementById('loginBtn');
         const label = document.getElementById('currentRoleLabel');
+
         if (currentRole === 'user') {
             serviceTab.style.display = 'none';
             listTab.style.display = 'none';
@@ -402,15 +416,19 @@
         document.getElementById('loginModal').style.display = 'flex';
         document.getElementById('loginIdentifier').focus();
     }
+    window.showLogin = showLogin;
 
-    function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
+    function closeLoginModal() {
+        document.getElementById('loginModal').style.display = 'none';
+    }
+    window.closeLoginModal = closeLoginModal;
 
-    // 登录逻辑（admin 固定管理员，无需密码）
     async function doLogin() {
         const identifier = document.getElementById('loginIdentifier').value.trim();
         if (!identifier) { showToast('请输入姓名或工号', 'error'); return; }
 
-        if (identifier.toLowerCase() === 'admin') {
+        // 固定管理员
+        if (identifier.toLowerCase() === 'admin' || identifier === '0000') {
             currentRole = 'admin';
             currentUser = { name: 'admin', employee_id: '0000', role: 'admin' };
             closeLoginModal();
@@ -420,9 +438,14 @@
             return;
         }
 
+        // 查询 accounts 表
+        let account = null;
         const { data: byName } = await supabaseClient.from('accounts').select('*').eq('name', identifier);
-        const { data: byId } = await supabaseClient.from('accounts').select('*').eq('employee_id', identifier);
-        const account = (byName && byName.length > 0) ? byName[0] : (byId && byId.length > 0) ? byId[0] : null;
+        if (byName && byName.length > 0) account = byName[0];
+        if (!account) {
+            const { data: byId } = await supabaseClient.from('accounts').select('*').eq('employee_id', identifier);
+            if (byId && byId.length > 0) account = byId[0];
+        }
 
         if (account) {
             currentRole = account.role;
@@ -432,11 +455,12 @@
             renderServiceList(); renderOrderList(); renderAccountList();
             showToast('登录成功', 'success');
         } else {
-            showToast('账号不存在，请联系管理员', 'error');
+            showToast('账号不存在', 'error');
         }
     }
+    window.doLogin = doLogin;
 
-    // ===================== 账号管理（admin/0000 不可删） =====================
+    // ===================== 账号管理 =====================
     async function renderAccountList() {
         if (currentRole !== 'admin') return;
         const { data, error } = await supabaseClient.from('accounts').select('*');
@@ -444,32 +468,23 @@
         const container = document.getElementById('accountList');
         container.innerHTML = data.map(acc => {
             const isImmutable = (acc.employee_id === '0000' || acc.name === 'admin');
-            return `
-                <div class="order-item">
-                    <span>${acc.name || ''} ${acc.employee_id ? '(' + acc.employee_id + ')' : ''} - ${acc.role}</span>
-                    ${isImmutable ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteAccount(${acc.id})">删除</button>`}
-                </div>
-            `;
+            return `<div class="order-item">
+                <span>${acc.name || ''} ${acc.employee_id ? '(' + acc.employee_id + ')' : ''} - ${acc.role}</span>
+                ${isImmutable ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteAccount(${acc.id})">删除</button>`}
+            </div>`;
         }).join('') || '<p style="color:var(--text-secondary);">暂无账号</p>';
     }
+    window.renderAccountList = renderAccountList;
 
     async function addAccount() {
         const name = document.getElementById('newAccountName').value.trim();
         const employeeId = document.getElementById('newAccountId').value.trim();
         const role = document.getElementById('newAccountRole').value;
         if (!name && !employeeId) { showToast('姓名和工号至少填一项', 'error'); return; }
-        // 防止重复插入
-        const { data: existing } = await supabaseClient.from('accounts').select('*').eq('employee_id', employeeId || name);
-        if (existing && existing.length > 0) {
-            showToast('该工号已存在', 'error');
-            return;
-        }
-        const payload = {
-            name: name || employeeId,
-            employee_id: employeeId || name,
-            password: '',
-            role: role
-        };
+        const checkId = employeeId || name;
+        const { data: existing } = await supabaseClient.from('accounts').select('*').eq('employee_id', checkId);
+        if (existing && existing.length > 0) { showToast('该工号已存在', 'error'); return; }
+        const payload = { name: name || employeeId, employee_id: checkId, password: '', role };
         const { error } = await supabaseClient.from('accounts').insert(payload);
         if (error) { showToast('添加失败: ' + error.message, 'error'); return; }
         showToast('账号添加成功', 'success');
@@ -477,42 +492,23 @@
         document.getElementById('newAccountId').value = '';
         renderAccountList();
     }
+    window.addAccount = addAccount;
 
     async function deleteAccount(id) {
-        // 二次确认，并防止误删不可变账号
-        const { data } = await supabaseClient.from('accounts').select('*').eq('id', id).single();
+        const { data } = await supabaseClient.from('accounts').select('*').eq('id', id).maybeSingle();
         if (data && (data.employee_id === '0000' || data.name === 'admin')) {
-            showToast('该管理员账号不可删除', 'error');
+            showToast('固定管理员不可删除', 'error');
             return;
         }
-        if (!confirm('确认删除该账号？')) return;
+        if (!confirm('确认删除？')) return;
         const { error } = await supabaseClient.from('accounts').delete().eq('id', id);
-        if (error) { showToast('删除失败: ' + error.message, 'error'); return; }
+        if (error) { showToast('删除失败', 'error'); return; }
         showToast('已删除', 'info');
         renderAccountList();
     }
+    window.deleteAccount = deleteAccount;
 
-    // 回车支持
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            if (document.getElementById('loginModal').style.display === 'flex') {
-                e.preventDefault();
-                doLogin();
-                return;
-            }
-            if (document.getElementById('detailModal').style.display === 'flex') {
-                e.preventDefault();
-                const saveBtn = document.querySelector('#detailModalFooter .btn-primary');
-                if (saveBtn) saveBtn.click();
-            }
-        }
-    });
-
-    // 其余数据操作函数（getAllOrders, generateOrderId, uploadFilesWithProgress 等）保持不变，此处略
-    // 由于篇幅，完整代码请参考前几次回复，或直接使用上方完整版
-    // ...（复制之前完整的 getAllOrders 等代码部分）
-
-    // ===================== 数据操作 =====================
+    // ===================== 数据库操作 =====================
     async function getAllOrders() {
         if (!dbConfigured) return [];
         const { data, error } = await supabaseClient.from('workorders').select('*').order('created_at', { ascending: false });
@@ -545,14 +541,14 @@
     async function generateOrderId() {
         const now = new Date();
         const yy = String(now.getFullYear()).slice(2);
-        const mm = String(now.getMonth()+1).padStart(2,'0');
-        const dd = String(now.getDate()).padStart(2,'0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
         const prefix = `${yy}${mm}${dd}`;
         const orders = await getAllOrders();
         const todayOrders = orders.filter(o => o.id.startsWith(prefix));
         let maxSeq = 0;
-        todayOrders.forEach(o => { const seq = parseInt(o.id.slice(6)); if (seq>maxSeq) maxSeq=seq; });
-        return prefix + String(maxSeq+1).padStart(3,'0');
+        todayOrders.forEach(o => { const seq = parseInt(o.id.slice(6)); if (seq > maxSeq) maxSeq = seq; });
+        return prefix + String(maxSeq + 1).padStart(3, '0');
     }
 
     async function uploadFilesWithProgress(files, orderId, subfolder = '') {
@@ -563,7 +559,7 @@
                 showToast(`文件 ${file.name} 超过100MB，已跳过`, 'error');
                 continue;
             }
-            const safeName = `${Date.now()}_${Math.random().toString(36).substring(2,8)}.${file.name.split('.').pop()}`;
+            const safeName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${file.name.split('.').pop()}`;
             const filePath = `${orderId}${subfolder}/${safeName}`;
             try {
                 const { error } = await supabaseClient.storage.from('attachments').upload(filePath, file);
@@ -577,9 +573,364 @@
         return urls;
     }
 
-    // 省略其余功能函数（提交、列表、详情、导出、二维码等）的重复粘贴，实际代码中请保留完整功能。
-    // 您可以直接使用本回答提供的完整 HTML，或者将上述账号管理部分与之前的功能合并。
+    // ===================== 需求提交 =====================
+    const fileInput = document.getElementById('fileInput');
+    const attachBox = document.getElementById('attachBox');
+    const attachList = document.getElementById('attachList');
+    attachBox.addEventListener('click', () => fileInput.click());
+    attachBox.addEventListener('dragover', e => { e.preventDefault(); attachBox.style.borderColor = 'var(--primary)'; });
+    attachBox.addEventListener('dragleave', () => attachBox.style.borderColor = 'var(--border)');
+    attachBox.addEventListener('drop', e => { e.preventDefault(); attachBox.style.borderColor = 'var(--border)'; handleRequestFiles(e.dataTransfer.files); });
+    fileInput.addEventListener('change', e => handleRequestFiles(e.target.files));
 
+    function handleRequestFiles(files) {
+        for (let file of files) {
+            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) { showToast('仅支持图片和视频', 'error'); continue; }
+            pendingFiles.push(file);
+        }
+        renderRequestAttachList();
+    }
+
+    function renderRequestAttachList() {
+        attachList.innerHTML = pendingFiles.map((file, idx) => `
+            <div class="attach-item">
+                <span>📄 ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)</span>
+                <span class="remove" onclick="removeRequestFile(${idx})">✕</span>
+            </div>
+        `).join('');
+    }
+    window.removeRequestFile = (idx) => { pendingFiles.splice(idx, 1); renderRequestAttachList(); };
+
+    async function submitRequest() {
+        if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
+        const required = ['companyName', 'hospitalName', 'feedbackName', 'feedbackPhone', 'customerName', 'customerPhone', 'deviceName', 'deviceModel', 'snNumber', 'faultDescription'];
+        let valid = true;
+        required.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el.value.trim()) { el.closest('.form-group').classList.add('error'); valid = false; }
+            else { el.closest('.form-group').classList.remove('error'); }
+        });
+        if (!valid) { showToast('请填写所有必填项', 'error'); return; }
+
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '⏳ 提交中...';
+
+        const orderId = await generateOrderId();
+        const attachmentUrls = await uploadFilesWithProgress(pendingFiles, orderId, '/request');
+        const newOrder = {
+            id: orderId,
+            company_name: document.getElementById('companyName').value,
+            hospital_name: document.getElementById('hospitalName').value,
+            hospital_address: document.getElementById('hospitalAddress').value,
+            feedback_name: document.getElementById('feedbackName').value,
+            feedback_phone: document.getElementById('feedbackPhone').value,
+            customer_name: document.getElementById('customerName').value,
+            customer_phone: document.getElementById('customerPhone').value,
+            device_name: document.getElementById('deviceName').value,
+            device_model: document.getElementById('deviceModel').value,
+            sn_number: document.getElementById('snNumber').value,
+            manufacturer: document.getElementById('manufacturer').value,
+            fault_description: document.getElementById('faultDescription').value,
+            after_sales_record: '', after_sales_solution: '',
+            status: 'pending',
+            handler: '',
+            attachments: attachmentUrls,
+            after_sales_attachments: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        const { error } = await supabaseClient.from('workorders').insert(newOrder);
+        if (error) { showToast('提交失败: ' + error.message, 'error'); }
+        else {
+            showToast(`工单 ${orderId} 提交成功！`, 'success');
+            document.querySelectorAll('#tab-request .form-input, #tab-request .form-textarea').forEach(el => el.value = '');
+            document.getElementById('companyName').value = '';
+            document.querySelectorAll('#tab-request .form-group.error').forEach(el => el.classList.remove('error'));
+            pendingFiles = []; renderRequestAttachList();
+            updateBadges();
+        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✅ 提交需求单';
+    }
+    window.submitRequest = submitRequest;
+
+    // ===================== 售后处理列表 =====================
+    async function renderServiceList() {
+        if (!dbConfigured || currentRole === 'user') return;
+        const orders = await getAllOrders();
+        const container = document.getElementById('serviceOrderList');
+        const countLabel = document.getElementById('serviceCountLabel');
+        const pendingCount = orders.filter(o => o.status === 'pending').length;
+        countLabel.textContent = `未处理: ${pendingCount} 个`;
+        if (orders.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
+            return;
+        }
+        container.innerHTML = orders.map(o => {
+            const isPending = o.status === 'pending';
+            const statusText = o.status === 'pending' ? '待处理' : o.status === 'processing' ? '处理中' : '已完成';
+            return `<div class="order-item ${isPending ? 'pending-highlight' : ''}">
+                <span class="order-id">${o.id}</span>
+                <div class="order-info"><div class="hospital">${o.hospitalName}</div><div class="device">${o.deviceName} / ${o.deviceModel} | 处理人: ${o.handler || '未分配'}</div></div>
+                <span class="status-badge status-${o.status}">${statusText}</span>
+                <button class="btn btn-ghost btn-sm" onclick="openDetailModal('${o.id}')">📋 处理</button>
+            </div>`;
+        }).join('');
+        updateBadges();
+    }
+    window.renderServiceList = renderServiceList;
+
+    async function renderOrderList() {
+        if (!dbConfigured || currentRole === 'user') {
+            document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">无权限</p>';
+            return;
+        }
+        const orders = await getAllOrders();
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('listSearchInput').value.toLowerCase();
+        let filtered = orders.filter(o => status === 'all' || o.status === status);
+        if (search) filtered = filtered.filter(o => o.id.includes(search) || o.hospitalName.toLowerCase().includes(search));
+        const container = document.getElementById('orderListContainer');
+        if (filtered.length === 0) container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
+        else container.innerHTML = filtered.map(o => {
+            const statusText = o.status === 'pending' ? '待处理' : o.status === 'processing' ? '处理中' : '已完成';
+            return `<div class="order-item" onclick="openDetailModal('${o.id}')">
+                <span class="order-id">${o.id}</span>
+                <div class="order-info"><div class="hospital">${o.hospitalName}</div><div class="device">${o.deviceName} / ${o.deviceModel} | 处理人: ${o.handler || '无'}</div></div>
+                <span class="status-badge status-${o.status}">${statusText}</span>
+            </div>`;
+        }).join('');
+    }
+    window.renderOrderList = renderOrderList;
+
+    async function updateBadges() {
+        if (!dbConfigured) return;
+        const orders = await getAllOrders();
+        const pendingCount = orders.filter(o => o.status === 'pending').length;
+        const serviceBadge = document.getElementById('serviceBadge');
+        serviceBadge.textContent = pendingCount || '';
+        serviceBadge.className = pendingCount ? 'tab-badge show' : 'tab-badge';
+    }
+
+    // ===================== 工单详情弹窗 =====================
+    async function openDetailModal(orderId) {
+        if (!dbConfigured) return;
+        const orders = await getAllOrders();
+        const order = orders.find(o => o.id === orderId);
+        if (!order) return;
+
+        const renderAttachments = (urls) => urls.map(url => {
+            const isVideo = url.match(/\.(mp4|avi|mov|webm)/i);
+            if (isVideo) {
+                return `<video src="${url}" controls preload="metadata" style="max-width:100%; max-height:200px; border-radius:8px;"></video>`;
+            } else {
+                return `<img src="${url}" class="img-thumb" onclick="window.open('${url}')" style="max-width:100px; max-height:80px; margin:4px;">`;
+            }
+        }).join('') || '无附件';
+
+        document.getElementById('detailModalBody').innerHTML = `
+            <div class="detail-grid">
+                <div class="detail-item"><span class="detail-label">公司</span><span class="detail-value">${order.companyName}</span></div>
+                <div class="detail-item"><span class="detail-label">医院</span><span class="detail-value">${order.hospitalName}</span></div>
+                <div class="detail-item"><span class="detail-label">地址</span><span class="detail-value">${order.hospitalAddress||'无'}</span></div>
+                <div class="detail-item"><span class="detail-label">反馈人</span><span class="detail-value">${order.feedbackName} / ${order.feedbackPhone}</span></div>
+                <div class="detail-item"><span class="detail-label">客户</span><span class="detail-value">${order.customerName} / ${order.customerPhone}</span></div>
+                <div class="detail-item"><span class="detail-label">设备</span><span class="detail-value">${order.deviceName} / ${order.deviceModel} / ${order.snNumber}</span></div>
+                <div class="detail-item"><span class="detail-label">厂家</span><span class="detail-value">${order.manufacturer||'无'}</span></div>
+                <div class="detail-item" style="grid-column:1/-1;"><span class="detail-label">异常描述</span><span class="detail-value">${order.faultDescription}</span></div>
+                <div class="detail-item" style="grid-column:1/-1;"><span class="detail-label">需求附件</span><div>${renderAttachments(order.attachments)}</div></div>
+            </div>
+            <hr style="margin:16px 0;">
+            <div class="form-group full">
+                <label class="form-label">🧑‍🔧 处理人</label>
+                <input type="text" class="form-input" id="editHandler-${order.id}" value="${order.handler || (currentUser ? currentUser.name || currentUser.employee_id : '')}">
+            </div>
+            <div class="form-group full">
+                <label class="form-label">🔍 售后核实记录</label>
+                <textarea class="form-textarea" id="editRecord-${order.id}" style="min-height:100px;">${order.afterSalesRecord||''}</textarea>
+            </div>
+            <div class="form-group full">
+                <label class="form-label">🛠️ 售后处理方案</label>
+                <textarea class="form-textarea" id="editSolution-${order.id}" style="min-height:100px;">${order.afterSalesSolution||''}</textarea>
+            </div>
+            <div class="form-group full">
+                <label class="form-label">📎 售后附件</label>
+                <div class="attach-area" id="afterAttachBox-${order.id}">
+                    <p style="margin:0;">点击或拖拽上传图片/视频</p>
+                    <input type="file" id="afterFileInput-${order.id}" accept="image/*,video/*" multiple style="display:none;">
+                </div>
+                <div class="attach-list" id="afterAttachList-${order.id}"></div>
+                <div>${renderAttachments(order.afterSalesAttachments)}</div>
+            </div>
+        `;
+
+        document.getElementById('detailModalFooter').innerHTML = `
+            <button class="btn btn-primary" onclick="saveDetailEdit('${order.id}')">💾 保存</button>
+            ${currentRole === 'admin' ? `<button class="btn btn-danger" onclick="deleteOrder('${order.id}')">🗑️ 删除</button>` : ''}
+            <button class="btn btn-ghost" onclick="closeDetailModal()">关闭</button>
+        `;
+
+        // 售后附件逻辑
+        if (!afterSalesFiles[order.id]) afterSalesFiles[order.id] = [];
+        const attachBoxEl = document.getElementById(`afterAttachBox-${order.id}`);
+        const fileInputEl = document.getElementById(`afterFileInput-${order.id}`);
+        const attachListEl = document.getElementById(`afterAttachList-${order.id}`);
+
+        const renderAfterList = () => {
+            attachListEl.innerHTML = afterSalesFiles[order.id].map((file, idx) => `
+                <div class="attach-item">
+                    <span>📄 ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)</span>
+                    <span class="remove" onclick="removeDetailAfterFile('${order.id}', ${idx})">✕</span>
+                </div>
+            `).join('');
+        };
+
+        attachBoxEl.onclick = () => fileInputEl.click();
+        attachBoxEl.ondragover = e => { e.preventDefault(); attachBoxEl.style.borderColor = 'var(--primary)'; };
+        attachBoxEl.ondragleave = () => attachBoxEl.style.borderColor = 'var(--border)';
+        attachBoxEl.ondrop = e => { e.preventDefault(); attachBoxEl.style.borderColor = 'var(--border)'; handleDetailAfterFiles(e.dataTransfer.files, order.id); };
+        fileInputEl.onchange = e => handleDetailAfterFiles(e.target.files, order.id);
+
+        window.handleDetailAfterFiles = (files, orderId) => {
+            for (let file of files) {
+                if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) { showToast('仅支持图片和视频', 'error'); continue; }
+                afterSalesFiles[orderId].push(file);
+            }
+            renderAfterList();
+        };
+        window.removeDetailAfterFile = (orderId, idx) => {
+            afterSalesFiles[orderId].splice(idx, 1);
+            renderAfterList();
+        };
+
+        document.getElementById('detailModal').style.display = 'flex';
+        makeDraggable(document.getElementById('detailModalDialog'), document.getElementById('detailDragHandle'));
+    }
+    window.openDetailModal = openDetailModal;
+
+    async function saveDetailEdit(orderId) {
+        const handler = document.getElementById(`editHandler-${orderId}`).value.trim();
+        const record = document.getElementById(`editRecord-${orderId}`).value.trim();
+        const solution = document.getElementById(`editSolution-${orderId}`).value.trim();
+        if (!record || !solution) { showToast('请完整填写售后记录和方案', 'error'); return; }
+        let afterAttachUrls = [];
+        if (afterSalesFiles[orderId] && afterSalesFiles[orderId].length > 0) {
+            afterAttachUrls = await uploadFilesWithProgress(afterSalesFiles[orderId], orderId, '/after');
+        }
+        const { error } = await supabaseClient.from('workorders').update({
+            handler: handler,
+            after_sales_record: record,
+            after_sales_solution: solution,
+            after_sales_attachments: afterAttachUrls,
+            status: 'completed',
+            updated_at: new Date().toISOString()
+        }).eq('id', orderId);
+        if (error) { showToast('保存失败: ' + error.message, 'error'); return; }
+        showToast('保存成功', 'success');
+        afterSalesFiles[orderId] = [];
+        closeDetailModal();
+        renderServiceList(); renderOrderList();
+        updateBadges();
+    }
+    window.saveDetailEdit = saveDetailEdit;
+
+    function closeDetailModal() { document.getElementById('detailModal').style.display = 'none'; }
+    window.closeDetailModal = closeDetailModal;
+
+    async function deleteOrder(orderId) {
+        if (currentRole !== 'admin') { showToast('仅管理员可删除', 'error'); return; }
+        if (!confirm('确定删除？')) return;
+        const { error } = await supabaseClient.from('workorders').delete().eq('id', orderId);
+        if (error) { showToast('删除失败', 'error'); return; }
+        showToast('已删除', 'info');
+        closeDetailModal();
+        renderServiceList(); renderOrderList();
+    }
+    window.deleteOrder = deleteOrder;
+
+    // ===================== 拖拽 =====================
+    function makeDraggable(dialog, handle) {
+        let offsetX, offsetY, isDown = false;
+        handle.onmousedown = function (e) {
+            isDown = true;
+            offsetX = e.clientX - dialog.getBoundingClientRect().left;
+            offsetY = e.clientY - dialog.getBoundingClientRect().top;
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+        function onMove(e) {
+            if (!isDown) return;
+            dialog.style.left = (e.clientX - offsetX) + 'px';
+            dialog.style.top = (e.clientY - offsetY) + 'px';
+            dialog.style.position = 'fixed';
+            dialog.style.margin = '0';
+        }
+        function onUp() {
+            isDown = false;
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+    }
+
+    // ===================== 二维码、导出 =====================
+    function showQRCode() {
+        const url = window.location.href;
+        document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
+        document.getElementById('qrUrlDisplay').textContent = url;
+        document.getElementById('qrModal').style.display = 'flex';
+    }
+    window.showQRCode = showQRCode;
+    function closeQRModal() { document.getElementById('qrModal').style.display = 'none'; }
+    window.closeQRModal = closeQRModal;
+    function copyCurrentURL() {
+        navigator.clipboard.writeText(window.location.href).then(() => showToast('链接已复制', 'info'));
+    }
+    window.copyCurrentURL = copyCurrentURL;
+
+    async function exportToExcel() {
+        if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
+        const orders = await getAllOrders();
+        if (orders.length === 0) { showToast('没有数据可导出', 'info'); return; }
+        const worksheet = XLSX.utils.json_to_sheet(orders.map(o => ({
+            '工单号': o.id, '状态': o.status, '公司': o.companyName,
+            '医院': o.hospitalName, '地址': o.hospitalAddress,
+            '反馈人': o.feedbackName, '反馈人电话': o.feedbackPhone,
+            '客户': o.customerName, '客户电话': o.customerPhone,
+            '设备名称': o.deviceName, '型号': o.deviceModel,
+            'SN': o.snNumber, '厂家': o.manufacturer,
+            '异常描述': o.faultDescription,
+            '处理人': o.handler,
+            '售后核实': o.afterSalesRecord, '处理方案': o.afterSalesSolution
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, '工单列表');
+        XLSX.writeFile(workbook, `工单_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        showToast('导出成功', 'success');
+    }
+    window.exportToExcel = exportToExcel;
+
+    // ===================== 回车支持 =====================
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            if (document.getElementById('loginModal').style.display === 'flex') {
+                e.preventDefault();
+                doLogin();
+            }
+            if (document.getElementById('detailModal').style.display === 'flex') {
+                e.preventDefault();
+                const saveBtn = document.querySelector('#detailModalFooter .btn-primary');
+                if (saveBtn) saveBtn.click();
+            }
+        }
+    });
+
+    // ===================== 初始化 =====================
+    updateUIByRole();
+    if (dbConfigured && currentRole !== 'user') {
+        renderServiceList();
+        renderOrderList();
+    }
 </script>
 </body>
 </html>
