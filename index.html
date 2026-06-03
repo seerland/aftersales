@@ -35,6 +35,7 @@
         .btn-primary { background: var(--primary); color: #fff; }
         .btn-outline { background: #fff; color: var(--primary); border-color: var(--primary); }
         .btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+        .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
         .container { max-width: 900px; margin: 0 auto; padding: 12px 12px 30px; }
         .tabs-nav {
             display: flex; background: var(--card-bg); border-radius: var(--radius);
@@ -47,11 +48,6 @@
             position: relative;
         }
         .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .tab-badge {
-            background: var(--danger); color: #fff; font-size: 0.65rem; padding: 2px 6px;
-            border-radius: 10px; margin-left: 4px; display: none;
-        }
-        .tab-badge.show { display: inline-block; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .card {
@@ -62,7 +58,6 @@
             display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
             flex-wrap: wrap; gap: 8px;
         }
-        .card-header h3 { margin: 0; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
         .form-group { display: flex; flex-direction: column; gap: 4px; }
@@ -91,9 +86,7 @@
             padding: 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
             transition: background 0.2s;
         }
-        .order-item.pending-highlight {
-            background: #fff7ed; border-color: #fcd9b8;
-        }
+        .order-item.pending-highlight { background: #fff7ed; border-color: #fcd9b8; }
         .order-id { font-family: monospace; font-weight: 700; color: var(--primary); min-width: 100px; }
         .order-info { flex: 1; }
         .order-info .hospital { font-weight: 600; font-size: 0.85rem; }
@@ -107,7 +100,7 @@
         .status-completed { background: #ecfdf5; color: #065f46; }
         .service-edit-area {
             background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
-            padding: 12px; margin-top: 12px; display: none;
+            padding: 12px; margin-top: 8px; display: none;
         }
         .service-edit-area.open { display: block; }
         .modal-overlay {
@@ -138,20 +131,18 @@
     <div>
         <button class="btn btn-ghost btn-sm" onclick="showQRCode()">📱 二维码</button>
         <button class="btn btn-outline btn-sm" onclick="exportToExcel()">📥 导出Excel</button>
+        <button class="btn btn-ghost btn-sm" id="loginBtn" onclick="showLogin()">🔑 售后登录</button>
+        <span id="currentRoleLabel" style="font-size:0.75rem;color:var(--text-secondary);"></span>
     </div>
 </header>
 
 <div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
-    <nav class="tabs-nav">
+    <nav class="tabs-nav" id="tabsNav">
         <button class="tab-btn active" onclick="switchTab('tab-request')">📝 需求提交</button>
-        <button class="tab-btn" onclick="switchTab('tab-service')" id="tabServiceBtn">
-            🔍 售后处理 <span class="tab-badge" id="serviceBadge"></span>
-        </button>
-        <button class="tab-btn" onclick="switchTab('tab-list')" id="tabListBtn">
-            📋 工单列表 <span class="tab-badge" id="pendingBadge"></span>
-        </button>
+        <button class="tab-btn" onclick="switchTab('tab-service')" id="tabServiceBtn" style="display:none;">🔍 售后处理</button>
+        <button class="tab-btn" onclick="switchTab('tab-list')" id="tabListBtn" style="display:none;">📋 工单列表</button>
     </nav>
 
     <!-- 需求提交 Tab -->
@@ -247,6 +238,16 @@
     </div>
 </div>
 
+<!-- 登录弹窗 -->
+<div class="modal-overlay" id="loginModal" style="display:none;" onclick="if(event.target===this)closeLoginModal()">
+    <div class="modal-dialog" style="text-align:center;">
+        <h3>🔐 身份验证</h3>
+        <input type="password" class="form-input" id="passwordInput" placeholder="请输入登录密码" style="margin:10px 0;">
+        <button class="btn btn-primary" onclick="doLogin()">登录</button>
+        <button class="btn btn-ghost" onclick="closeLoginModal()">取消</button>
+    </div>
+</div>
+
 <!-- 二维码弹窗 -->
 <div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
     <div class="modal-dialog" style="text-align:center;">
@@ -268,8 +269,13 @@
     const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
 
+    // 密码（不区分大小写）
+    const SERVICE_PASSWORD = 'seerland';
+    const ADMIN_PASSWORD = 'admin';
+
     let supabaseClient = null;
     let dbConfigured = false;
+    let currentRole = 'user'; // 'user', 'service', 'admin'
 
     function initSupabase() {
         try {
@@ -281,7 +287,11 @@
     }
     initSupabase();
 
+    // 需求提交附件暂存
     let pendingFiles = [];
+
+    // 售后处理附件暂存（每个工单独立）
+    let afterSalesFiles = {};
 
     function showToast(msg, type='info') {
         const container = document.getElementById('toastContainer');
@@ -309,7 +319,6 @@
         return prefix + String(maxSeq+1).padStart(3,'0');
     }
 
-    // ===================== 数据库操作 =====================
     async function getAllOrders() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return []; }
         const { data, error } = await supabaseClient.from('workorders').select('*').order('created_at', { ascending: false });
@@ -332,73 +341,105 @@
             afterSalesSolution: o.after_sales_solution || '',
             status: o.status,
             attachments: o.attachments || [],
+            afterSalesAttachments: o.after_sales_attachments || [],
             createdAt: o.created_at,
             updatedAt: o.updated_at
         }));
     }
+
+    // ===================== 权限控制 =====================
+    function updateUIByRole() {
+        const serviceTab = document.getElementById('tabServiceBtn');
+        const listTab = document.getElementById('tabListBtn');
+        const loginBtn = document.getElementById('loginBtn');
+        const label = document.getElementById('currentRoleLabel');
+
+        if (currentRole === 'user') {
+            serviceTab.style.display = 'none';
+            listTab.style.display = 'none';
+            loginBtn.textContent = '🔑 售后登录';
+            label.textContent = '当前：访客';
+        } else {
+            serviceTab.style.display = '';
+            listTab.style.display = '';
+            loginBtn.textContent = '🔑 退出登录';
+            label.textContent = currentRole === 'admin' ? '当前：管理员' : '当前：售后人员';
+        }
+        switchTab('tab-request');
+    }
+
+    function showLogin() {
+        if (currentRole !== 'user') {
+            currentRole = 'user';
+            updateUIByRole();
+            showToast('已退出登录');
+            return;
+        }
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('loginModal').style.display = 'flex';
+    }
+
+    function closeLoginModal() {
+        document.getElementById('loginModal').style.display = 'none';
+    }
+
+    function doLogin() {
+        const pwd = document.getElementById('passwordInput').value.trim().toLowerCase();
+        if (pwd === SERVICE_PASSWORD.toLowerCase()) {
+            currentRole = 'service';
+            showToast('售后人员登录成功', 'success');
+        } else if (pwd === ADMIN_PASSWORD.toLowerCase()) {
+            currentRole = 'admin';
+            showToast('管理员登录成功', 'success');
+        } else {
+            showToast('密码错误', 'error');
+            return;
+        }
+        closeLoginModal();
+        updateUIByRole();
+        renderServiceList();
+        renderOrderList();
+    }
+    window.showLogin = showLogin;
+    window.doLogin = doLogin;
+    window.closeLoginModal = closeLoginModal;
+
+    // 删除工单（仅管理员）
+    async function deleteOrder(orderId) {
+        if (currentRole !== 'admin') {
+            showToast('仅管理员可删除记录', 'error');
+            return;
+        }
+        if (!confirm('确定永久删除工单 ' + orderId + ' 吗？')) return;
+        const { error } = await supabaseClient.from('workorders').delete().eq('id', orderId);
+        if (error) { showToast('删除失败', 'error'); return; }
+        showToast('已删除', 'info');
+        renderServiceList();
+        renderOrderList();
+        closeDetailModal();
+    }
+    window.deleteOrder = deleteOrder;
 
     // ===================== Tab 切换 =====================
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
-        document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
-        if (tabId === 'tab-service') renderServiceList();
-        if (tabId === 'tab-list') renderOrderList();
-        updateBadges();
+        const btn = document.querySelector(`[onclick="switchTab('${tabId}')"]`);
+        if (btn) btn.classList.add('active');
+        if (tabId === 'tab-service' && currentRole !== 'user') renderServiceList();
+        if (tabId === 'tab-list' && currentRole !== 'user') renderOrderList();
     }
     window.switchTab = switchTab;
 
-    // ===================== 附件处理 =====================
-    const fileInput = document.getElementById('fileInput');
-    const attachBox = document.getElementById('attachBox');
-    const attachList = document.getElementById('attachList');
-
-    attachBox.addEventListener('click', () => fileInput.click());
-    attachBox.addEventListener('dragover', e => { e.preventDefault(); attachBox.style.borderColor = 'var(--primary)'; });
-    attachBox.addEventListener('dragleave', () => attachBox.style.borderColor = 'var(--border)');
-    attachBox.addEventListener('drop', e => {
-        e.preventDefault();
-        attachBox.style.borderColor = 'var(--border)';
-        handleFiles(e.dataTransfer.files);
-    });
-    fileInput.addEventListener('change', e => handleFiles(e.target.files));
-
-    function handleFiles(files) {
-        for (let file of files) {
-            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-                showToast('仅支持图片和视频', 'error');
-                continue;
-            }
-            if (file.size > 50 * 1024 * 1024) {
-                showToast('文件不能超过50MB', 'error');
-                continue;
-            }
-            pendingFiles.push(file);
-        }
-        renderAttachList();
-    }
-
-    function renderAttachList() {
-        attachList.innerHTML = pendingFiles.map((file, idx) => `
-            <div class="attach-item">
-                <span>📄 ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)</span>
-                <span class="remove" onclick="removeFile(${idx})">✕</span>
-            </div>
-        `).join('');
-    }
-    window.removeFile = idx => {
-        pendingFiles.splice(idx, 1);
-        renderAttachList();
-    };
-
-    async function uploadFiles(orderId) {
-        if (pendingFiles.length === 0) return [];
-        if (!dbConfigured) { showToast('数据库未配置', 'error'); return []; }
+    // ===================== 附件上传通用函数 =====================
+    async function uploadFiles(files, orderId, subfolder = '') {
+        if (files.length === 0) return [];
+        if (!dbConfigured) return [];
         const urls = [];
-        for (let file of pendingFiles) {
+        for (let file of files) {
             const safeName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${file.name.split('.').pop()}`;
-            const filePath = `${orderId}/${safeName}`;
+            const filePath = `${orderId}${subfolder}/${safeName}`;
             const { error } = await supabaseClient.storage.from('attachments').upload(filePath, file);
             if (error) {
                 showToast(`上传失败: ${file.name}`, 'error');
@@ -409,6 +450,46 @@
         }
         return urls;
     }
+
+    // ===================== 需求提交附件 =====================
+    const fileInput = document.getElementById('fileInput');
+    const attachBox = document.getElementById('attachBox');
+    const attachList = document.getElementById('attachList');
+
+    attachBox.addEventListener('click', () => fileInput.click());
+    attachBox.addEventListener('dragover', e => { e.preventDefault(); attachBox.style.borderColor = 'var(--primary)'; });
+    attachBox.addEventListener('dragleave', () => attachBox.style.borderColor = 'var(--border)');
+    attachBox.addEventListener('drop', e => {
+        e.preventDefault();
+        attachBox.style.borderColor = 'var(--border)';
+        handleRequestFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', e => handleRequestFiles(e.target.files));
+
+    function handleRequestFiles(files) {
+        for (let file of files) {
+            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+                showToast('仅支持图片和视频', 'error');
+                continue;
+            }
+            // 无大小限制
+            pendingFiles.push(file);
+        }
+        renderRequestAttachList();
+    }
+
+    function renderRequestAttachList() {
+        attachList.innerHTML = pendingFiles.map((file, idx) => `
+            <div class="attach-item">
+                <span>📄 ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)</span>
+                <span class="remove" onclick="removeRequestFile(${idx})">✕</span>
+            </div>
+        `).join('');
+    }
+    window.removeRequestFile = idx => {
+        pendingFiles.splice(idx, 1);
+        renderRequestAttachList();
+    };
 
     // ===================== 提交需求 =====================
     document.getElementById('submitBtn').addEventListener('click', async () => {
@@ -431,7 +512,7 @@
         submitBtn.textContent = '⏳ 提交中...';
 
         const orderId = await generateOrderId();
-        const attachmentUrls = await uploadFiles(orderId);
+        const attachmentUrls = await uploadFiles(pendingFiles, orderId, '/request');
 
         const newOrder = {
             id: orderId,
@@ -451,6 +532,7 @@
             after_sales_solution: '',
             status: 'pending',
             attachments: attachmentUrls,
+            after_sales_attachments: [],
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
@@ -460,13 +542,11 @@
             showToast('提交失败: ' + error.message, 'error');
         } else {
             showToast(`工单 ${orderId} 提交成功！`, 'success');
-            // 清空表单
             document.querySelectorAll('#tab-request .form-input, #tab-request .form-textarea').forEach(el => el.value = '');
             document.getElementById('companyName').value = '';
             document.querySelectorAll('#tab-request .form-group.error').forEach(el => el.classList.remove('error'));
             pendingFiles = [];
-            renderAttachList();
-            updateBadges();
+            renderRequestAttachList();
         }
         submitBtn.disabled = false;
         submitBtn.textContent = '✅ 提交需求单';
@@ -474,30 +554,30 @@
 
     // ===================== 售后处理列表 =====================
     async function renderServiceList() {
-        if (!dbConfigured) return;
+        if (!dbConfigured || currentRole === 'user') return;
         const orders = await getAllOrders();
-        // 默认显示所有待处理和处理中的工单，也可加上已完成，但突出显示未处理的
-        const serviceContainer = document.getElementById('serviceOrderList');
+        const container = document.getElementById('serviceOrderList');
         const countLabel = document.getElementById('serviceCountLabel');
-        const pendingOrders = orders.filter(o => o.status === 'pending');
-        countLabel.textContent = `未处理: ${pendingOrders.length} 个`;
+        const pendingCount = orders.filter(o => o.status === 'pending').length;
+        countLabel.textContent = `未处理: ${pendingCount} 个`;
 
         if (orders.length === 0) {
-            serviceContainer.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
+            container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
             return;
         }
 
-        serviceContainer.innerHTML = orders.map(o => {
+        container.innerHTML = orders.map(o => {
             const isPending = o.status === 'pending';
             const statusText = o.status === 'pending' ? '待处理' : o.status === 'processing' ? '处理中' : '已完成';
             return `
-                <div class="order-item ${isPending ? 'pending-highlight' : ''}" id="service-item-${o.id}">
+                <div class="order-item ${isPending ? 'pending-highlight' : ''}">
                     <span class="order-id">${o.id}</span>
                     <div class="order-info">
                         <div class="hospital">${o.hospitalName}</div>
                         <div class="device">${o.deviceName} / ${o.deviceModel} | ${o.snNumber}</div>
                     </div>
                     <span class="status-badge status-${o.status}">${statusText}</span>
+                    <button class="btn btn-ghost btn-sm" onclick="openDetailModal('${o.id}')">📋 查看</button>
                     <button class="btn btn-ghost btn-sm" onclick="toggleServiceEdit('${o.id}')">✏️ 处理</button>
                 </div>
                 <div class="service-edit-area" id="edit-${o.id}">
@@ -505,11 +585,73 @@
                     <textarea class="form-textarea" id="record-${o.id}" style="margin-bottom:8px;">${o.afterSalesRecord||''}</textarea>
                     <label class="form-label">售后处理方案</label>
                     <textarea class="form-textarea" id="solution-${o.id}" style="margin-bottom:8px;">${o.afterSalesSolution||''}</textarea>
-                    <button class="btn btn-primary" onclick="saveServiceFromList('${o.id}')">保存</button>
+                    <div class="attach-area" id="afterAttachBox-${o.id}">
+                        <p style="margin:0;">📎 上传附件（图片/视频）</p>
+                        <input type="file" id="afterFileInput-${o.id}" accept="image/*,video/*" multiple style="display:none;">
+                    </div>
+                    <div class="attach-list" id="afterAttachList-${o.id}"></div>
+                    <button class="btn btn-primary mt-2" onclick="saveServiceFromList('${o.id}')">保存</button>
                 </div>
             `;
         }).join('');
+
+        // 为每个工单绑定上传事件
+        orders.forEach(o => {
+            if (!afterSalesFiles[o.id]) afterSalesFiles[o.id] = [];
+            const attachBoxEl = document.getElementById(`afterAttachBox-${o.id}`);
+            const fileInputEl = document.getElementById(`afterFileInput-${o.id}`);
+            const attachListEl = document.getElementById(`afterAttachList-${o.id}`);
+            if (!attachBoxEl || !fileInputEl) return;
+
+            const renderAfterList = () => {
+                attachListEl.innerHTML = afterSalesFiles[o.id].map((file, idx) => `
+                    <div class="attach-item">
+                        <span>📄 ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)</span>
+                        <span class="remove" onclick="removeAfterFile('${o.id}', ${idx})">✕</span>
+                    </div>
+                `).join('');
+            };
+
+            attachBoxEl.onclick = () => fileInputEl.click();
+            attachBoxEl.ondragover = e => { e.preventDefault(); attachBoxEl.style.borderColor = 'var(--primary)'; };
+            attachBoxEl.ondragleave = () => attachBoxEl.style.borderColor = 'var(--border)';
+            attachBoxEl.ondrop = e => {
+                e.preventDefault();
+                attachBoxEl.style.borderColor = 'var(--border)';
+                handleAfterFiles(e.dataTransfer.files, o.id);
+            };
+            fileInputEl.onchange = e => handleAfterFiles(e.target.files, o.id);
+
+            window[`handleAfterFiles_${o.id}`] = (files, orderId) => {
+                for (let file of files) {
+                    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+                        showToast('仅支持图片和视频', 'error');
+                        continue;
+                    }
+                    afterSalesFiles[orderId].push(file);
+                }
+                renderAfterList();
+            };
+            // 全局引用
+            window.handleAfterFiles = (files, orderId) => {
+                const func = window[`handleAfterFiles_${orderId}`];
+                if (func) func(files, orderId);
+            };
+            window.removeAfterFile = (orderId, idx) => {
+                afterSalesFiles[orderId].splice(idx, 1);
+                const list = document.getElementById(`afterAttachList-${orderId}`);
+                if (list) {
+                    list.innerHTML = afterSalesFiles[orderId].map((file, i) => `
+                        <div class="attach-item">
+                            <span>📄 ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)</span>
+                            <span class="remove" onclick="removeAfterFile('${orderId}', ${i})">✕</span>
+                        </div>
+                    `).join('');
+                }
+            };
+        });
     }
+
     window.toggleServiceEdit = (orderId) => {
         const editArea = document.getElementById(`edit-${orderId}`);
         if (editArea) editArea.classList.toggle('open');
@@ -519,23 +661,34 @@
         const record = document.getElementById(`record-${orderId}`).value.trim();
         const solution = document.getElementById(`solution-${orderId}`).value.trim();
         if (!record || !solution) { showToast('请完整填写售后记录和方案', 'error'); return; }
+
+        let afterAttachUrls = [];
+        if (afterSalesFiles[orderId] && afterSalesFiles[orderId].length > 0) {
+            afterAttachUrls = await uploadFiles(afterSalesFiles[orderId], orderId, '/after');
+        }
+
         const { error } = await supabaseClient.from('workorders').update({
             after_sales_record: record,
             after_sales_solution: solution,
+            after_sales_attachments: afterAttachUrls,
             status: 'completed',
             updated_at: new Date().toISOString()
         }).eq('id', orderId);
-        if (error) { showToast('保存失败', 'error'); return; }
+
+        if (error) {
+            showToast('保存失败: ' + error.message, 'error');
+            return;
+        }
         showToast('售后信息保存成功', 'success');
+        afterSalesFiles[orderId] = [];
         renderServiceList();
-        updateBadges();
     }
     window.saveServiceFromList = saveServiceFromList;
 
-    // ===================== 工单列表（全局查看） =====================
+    // ===================== 工单列表 =====================
     async function renderOrderList() {
-        if (!dbConfigured) {
-            document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">数据库未连接</p>';
+        if (!dbConfigured || currentRole === 'user') {
+            document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">无权限访问</p>';
             return;
         }
         const orders = await getAllOrders();
@@ -562,27 +715,8 @@
                 `;
             }).join('');
         }
-        updateBadges();
     }
     window.renderOrderList = renderOrderList;
-
-    // ===================== 更新角标数字 =====================
-    async function updateBadges() {
-        if (!dbConfigured) return;
-        const orders = await getAllOrders();
-        const pendingCount = orders.filter(o => o.status === 'pending').length;
-        const processingCount = orders.filter(o => o.status === 'processing').length;
-
-        // 售后处理 Tab 显示未处理数量
-        const serviceBadge = document.getElementById('serviceBadge');
-        serviceBadge.textContent = pendingCount || '';
-        serviceBadge.className = pendingCount ? 'tab-badge show' : 'tab-badge';
-
-        // 工单列表 Tab 显示待处理数量
-        const pendingBadge = document.getElementById('pendingBadge');
-        pendingBadge.textContent = pendingCount || '';
-        pendingBadge.className = pendingCount ? 'tab-badge show' : 'tab-badge';
-    }
 
     // ===================== 工单详情弹窗 =====================
     async function openDetailModal(orderId) {
@@ -590,10 +724,15 @@
         const orders = await getAllOrders();
         const order = orders.find(o => o.id === orderId);
         if (!order) return;
-        const attHtml = order.attachments?.length ? order.attachments.map(url => {
+        const attHtml = (order.attachments || []).map(url => {
             const isVideo = url.match(/\.(mp4|avi|mov)/i);
             return isVideo ? `<video src="${url}" controls style="max-width:100%;max-height:200px;"></video>` : `<img src="${url}" style="max-width:100%;max-height:200px;">`;
-        }).join('') : '无附件';
+        }).join('') || '无附件';
+        const afterAttHtml = (order.afterSalesAttachments || []).map(url => {
+            const isVideo = url.match(/\.(mp4|avi|mov)/i);
+            return isVideo ? `<video src="${url}" controls style="max-width:100%;max-height:200px;"></video>` : `<img src="${url}" style="max-width:100%;max-height:200px;">`;
+        }).join('') || '无附件';
+        const deleteBtn = currentRole === 'admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteOrder('${order.id}')">🗑️ 删除工单</button>` : '';
         document.getElementById('detailModalContent').innerHTML = `
             <h3>工单详情 - ${order.id}</h3>
             <p><strong>公司：</strong>${order.companyName}</p>
@@ -604,9 +743,11 @@
             <p><strong>设备：</strong>${order.deviceName} / ${order.deviceModel} / ${order.snNumber}</p>
             <p><strong>厂家：</strong>${order.manufacturer||'无'}</p>
             <p><strong>异常描述：</strong>${order.faultDescription}</p>
-            <p><strong>附件：</strong></p><div>${attHtml}</div>
+            <p><strong>需求附件：</strong></p><div>${attHtml}</div>
             <p><strong>售后核实：</strong>${order.afterSalesRecord||'未填写'}</p>
             <p><strong>处理方案：</strong>${order.afterSalesSolution||'未填写'}</p>
+            <p><strong>售后附件：</strong></p><div>${afterAttHtml}</div>
+            ${deleteBtn}
             <button class="btn btn-ghost" onclick="closeDetailModal()">关闭</button>
         `;
         document.getElementById('detailModal').style.display = 'flex';
@@ -653,12 +794,11 @@
 
     // ===================== 初始化 =====================
     (async function() {
-        if (dbConfigured) {
-            await updateBadges();
-            await renderOrderList();
+        updateUIByRole();
+        if (dbConfigured && currentRole !== 'user') {
             await renderServiceList();
+            await renderOrderList();
         }
-        switchTab('tab-request');
     })();
 </script>
 </body>
