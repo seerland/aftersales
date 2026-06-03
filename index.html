@@ -44,6 +44,7 @@
             flex: 1 0 auto; padding: 10px 14px; border: none; background: transparent;
             border-radius: 9px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
             color: var(--text-secondary); transition: all 0.2s; white-space: nowrap;
+            position: relative;
         }
         .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .tab-badge {
@@ -62,15 +63,6 @@
             flex-wrap: wrap; gap: 8px;
         }
         .card-header h3 { margin: 0; }
-        .order-id-mini {
-            background: #f0f7ff; border: 1px solid var(--primary); border-radius: 6px;
-            padding: 4px 8px; font-family: monospace; font-weight: 700; color: var(--primary);
-            font-size: 0.85rem; display: flex; align-items: center; gap: 4px;
-        }
-        .order-id-mini input {
-            border: none; background: transparent; font-family: inherit; font-weight: inherit;
-            color: inherit; font-size: inherit; width: 105px; outline: none; text-align: right;
-        }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
         .form-group { display: flex; flex-direction: column; gap: 4px; }
@@ -97,9 +89,15 @@
         .order-item {
             background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
             padding: 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            transition: background 0.2s;
+        }
+        .order-item.pending-highlight {
+            background: #fff7ed; border-color: #fcd9b8;
         }
         .order-id { font-family: monospace; font-weight: 700; color: var(--primary); min-width: 100px; }
         .order-info { flex: 1; }
+        .order-info .hospital { font-weight: 600; font-size: 0.85rem; }
+        .order-info .device { font-size: 0.73rem; color: var(--text-secondary); }
         .status-badge {
             display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
             border-radius: 12px; font-size: 0.7rem; font-weight: 600;
@@ -107,6 +105,11 @@
         .status-pending { background: #fff7ed; color: #c2410c; }
         .status-processing { background: #eff6ff; color: #1d4ed8; }
         .status-completed { background: #ecfdf5; color: #065f46; }
+        .service-edit-area {
+            background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
+            padding: 12px; margin-top: 12px; display: none;
+        }
+        .service-edit-area.open { display: block; }
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200;
             display: flex; align-items: center; justify-content: center; padding: 12px;
@@ -122,6 +125,7 @@
         }
         .toast-success { background: #059669; } .toast-error { background: #dc2626; } .toast-info { background: #2563eb; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        .mt-2 { margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -142,20 +146,18 @@
 <div class="container">
     <nav class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab('tab-request')">📝 需求提交</button>
-        <button class="tab-btn" onclick="switchTab('tab-service')">🔍 售后处理</button>
+        <button class="tab-btn" onclick="switchTab('tab-service')" id="tabServiceBtn">
+            🔍 售后处理 <span class="tab-badge" id="serviceBadge"></span>
+        </button>
         <button class="tab-btn" onclick="switchTab('tab-list')" id="tabListBtn">
             📋 工单列表 <span class="tab-badge" id="pendingBadge"></span>
         </button>
     </nav>
 
+    <!-- 需求提交 Tab -->
     <div class="tab-content active" id="tab-request">
         <div class="card">
-            <div class="card-header">
-                <h3>提交售后需求</h3>
-                <div class="order-id-mini">
-                    📋 <input type="text" id="orderIdDisplay" value="加载中..." title="工单号可手动修改">
-                </div>
-            </div>
+            <h3 style="margin-bottom:12px;">提交售后需求</h3>
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label"><span class="required-star">*</span> 公司名称</label>
@@ -217,18 +219,18 @@
         </div>
     </div>
 
+    <!-- 售后处理 Tab -->
     <div class="tab-content" id="tab-service">
         <div class="card">
-            <h3 style="margin-bottom:12px;">查找工单并处理</h3>
-            <div style="display:flex;gap:8px;margin-bottom:12px;">
-                <input type="text" class="form-input" id="searchOrderId" placeholder="输入工单号" style="flex:1;">
-                <button class="btn btn-primary" onclick="searchOrder()">查找</button>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <h3>待处理工单</h3>
+                <span style="font-size:0.85rem;color:var(--text-secondary);" id="serviceCountLabel"></span>
             </div>
-            <div id="serviceResult"></div>
-            <div id="serviceEmpty" style="color:var(--text-secondary);text-align:center;">请输入工单号查找</div>
+            <div class="order-list" id="serviceOrderList"></div>
         </div>
     </div>
 
+    <!-- 工单列表 Tab -->
     <div class="tab-content" id="tab-list">
         <div class="card">
             <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -245,6 +247,7 @@
     </div>
 </div>
 
+<!-- 二维码弹窗 -->
 <div class="modal-overlay" id="qrModal" style="display:none;" onclick="if(event.target===this)closeQRModal()">
     <div class="modal-dialog" style="text-align:center;">
         <h3>📱 扫码访问系统</h3>
@@ -255,16 +258,16 @@
     </div>
 </div>
 
+<!-- 工单详情弹窗 -->
 <div class="modal-overlay" id="detailModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
     <div class="modal-dialog" id="detailModalContent"></div>
 </div>
 
 <script>
-    // ===================== 你的 Supabase 配置（已填入，无需修改） =====================
+    // ===================== 配置 =====================
     const SUPABASE_URL = 'https://eeniyrdinbvcqqcencvg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlbml5cmRpbmJ2Y3FxY2VuY3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTI5OTgsImV4cCI6MjA5NTU4ODk5OH0.KR8kr-rbgJopCBh5K0s7nv7LeyMRnxb9AlF63z04Gyw';
 
-    // 使用 supabaseClient 避免与全局变量冲突
     let supabaseClient = null;
     let dbConfigured = false;
 
@@ -289,20 +292,24 @@
         setTimeout(() => div.remove(), 3000);
     }
 
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        const btn = document.querySelector(`[onclick="switchTab('${tabId}')"]`);
-        if (btn) btn.classList.add('active');
-        if (tabId === 'tab-list' && dbConfigured) renderOrderList();
-        if (tabId === 'tab-service') {
-            document.getElementById('serviceResult').innerHTML = '';
-            document.getElementById('serviceEmpty').style.display = 'block';
-        }
+    // 工单号生成：年2位+月2位+日2位+3位序号
+    async function generateOrderId() {
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(2);
+        const mm = String(now.getMonth()+1).padStart(2,'0');
+        const dd = String(now.getDate()).padStart(2,'0');
+        const prefix = `${yy}${mm}${dd}`;
+        const orders = await getAllOrders();
+        const todayOrders = orders.filter(o => o.id.startsWith(prefix));
+        let maxSeq = 0;
+        todayOrders.forEach(o => {
+            const seq = parseInt(o.id.slice(6));
+            if (seq > maxSeq) maxSeq = seq;
+        });
+        return prefix + String(maxSeq+1).padStart(3,'0');
     }
-    window.switchTab = switchTab;
 
+    // ===================== 数据库操作 =====================
     async function getAllOrders() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return []; }
         const { data, error } = await supabaseClient.from('workorders').select('*').order('created_at', { ascending: false });
@@ -330,24 +337,19 @@
         }));
     }
 
-    async function generateOrderId() {
-        if (!dbConfigured) return 'YYYYMMDD001';
-        const now = new Date();
-        const prefix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-        const orders = await getAllOrders();
-        const todayOrders = orders.filter(o => o.id.startsWith(prefix));
-        let maxSeq = 0;
-        todayOrders.forEach(o => { const num = parseInt(o.id.slice(8)); if(num>maxSeq) maxSeq=num; });
-        return prefix + String(maxSeq+1).padStart(3,'0');
+    // ===================== Tab 切换 =====================
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        if (tabId === 'tab-service') renderServiceList();
+        if (tabId === 'tab-list') renderOrderList();
+        updateBadges();
     }
+    window.switchTab = switchTab;
 
-    async function refreshOrderIdDisplay() {
-        const id = await generateOrderId();
-        document.getElementById('orderIdDisplay').value = id;
-    }
-    refreshOrderIdDisplay();
-
-    // ===================== 附件处理（已修复文件名编码问题） =====================
+    // ===================== 附件处理 =====================
     const fileInput = document.getElementById('fileInput');
     const attachBox = document.getElementById('attachBox');
     const attachList = document.getElementById('attachList');
@@ -395,7 +397,6 @@
         if (!dbConfigured) { showToast('数据库未配置', 'error'); return []; }
         const urls = [];
         for (let file of pendingFiles) {
-            // 强制使用安全文件名，避免中文编码导致400错误
             const safeName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${file.name.split('.').pop()}`;
             const filePath = `${orderId}/${safeName}`;
             const { error } = await supabaseClient.storage.from('attachments').upload(filePath, file);
@@ -409,12 +410,9 @@
         return urls;
     }
 
-    // ===================== 提交表单 =====================
+    // ===================== 提交需求 =====================
     document.getElementById('submitBtn').addEventListener('click', async () => {
-        if (!dbConfigured) {
-            showToast('数据库未连接', 'error');
-            return;
-        }
+        if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const required = ['companyName','hospitalName','feedbackName','feedbackPhone','customerName','customerPhone','deviceName','deviceModel','snNumber','faultDescription'];
         let valid = true;
         required.forEach(id => {
@@ -428,21 +426,11 @@
         });
         if (!valid) { showToast('请填写所有必填项', 'error'); return; }
 
-        const orderId = document.getElementById('orderIdDisplay').value.trim();
-        if (!orderId) { showToast('工单号不能为空', 'error'); return; }
-
         const submitBtn = document.getElementById('submitBtn');
         submitBtn.disabled = true;
         submitBtn.textContent = '⏳ 提交中...';
 
-        const existing = await getAllOrders();
-        if (existing.some(o => o.id === orderId)) {
-            showToast('工单号已存在，请修改', 'error');
-            submitBtn.disabled = false;
-            submitBtn.textContent = '✅ 提交需求单';
-            return;
-        }
-
+        const orderId = await generateOrderId();
         const attachmentUrls = await uploadFiles(orderId);
 
         const newOrder = {
@@ -471,20 +459,80 @@
         if (error) {
             showToast('提交失败: ' + error.message, 'error');
         } else {
-            showToast('工单提交成功！', 'success');
+            showToast(`工单 ${orderId} 提交成功！`, 'success');
+            // 清空表单
             document.querySelectorAll('#tab-request .form-input, #tab-request .form-textarea').forEach(el => el.value = '');
             document.getElementById('companyName').value = '';
             document.querySelectorAll('#tab-request .form-group.error').forEach(el => el.classList.remove('error'));
             pendingFiles = [];
             renderAttachList();
-            refreshOrderIdDisplay();
-            updatePendingBadge();
+            updateBadges();
         }
         submitBtn.disabled = false;
         submitBtn.textContent = '✅ 提交需求单';
     });
 
-    // ===================== 工单列表 =====================
+    // ===================== 售后处理列表 =====================
+    async function renderServiceList() {
+        if (!dbConfigured) return;
+        const orders = await getAllOrders();
+        // 默认显示所有待处理和处理中的工单，也可加上已完成，但突出显示未处理的
+        const serviceContainer = document.getElementById('serviceOrderList');
+        const countLabel = document.getElementById('serviceCountLabel');
+        const pendingOrders = orders.filter(o => o.status === 'pending');
+        countLabel.textContent = `未处理: ${pendingOrders.length} 个`;
+
+        if (orders.length === 0) {
+            serviceContainer.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
+            return;
+        }
+
+        serviceContainer.innerHTML = orders.map(o => {
+            const isPending = o.status === 'pending';
+            const statusText = o.status === 'pending' ? '待处理' : o.status === 'processing' ? '处理中' : '已完成';
+            return `
+                <div class="order-item ${isPending ? 'pending-highlight' : ''}" id="service-item-${o.id}">
+                    <span class="order-id">${o.id}</span>
+                    <div class="order-info">
+                        <div class="hospital">${o.hospitalName}</div>
+                        <div class="device">${o.deviceName} / ${o.deviceModel} | ${o.snNumber}</div>
+                    </div>
+                    <span class="status-badge status-${o.status}">${statusText}</span>
+                    <button class="btn btn-ghost btn-sm" onclick="toggleServiceEdit('${o.id}')">✏️ 处理</button>
+                </div>
+                <div class="service-edit-area" id="edit-${o.id}">
+                    <label class="form-label">售后核实记录</label>
+                    <textarea class="form-textarea" id="record-${o.id}" style="margin-bottom:8px;">${o.afterSalesRecord||''}</textarea>
+                    <label class="form-label">售后处理方案</label>
+                    <textarea class="form-textarea" id="solution-${o.id}" style="margin-bottom:8px;">${o.afterSalesSolution||''}</textarea>
+                    <button class="btn btn-primary" onclick="saveServiceFromList('${o.id}')">保存</button>
+                </div>
+            `;
+        }).join('');
+    }
+    window.toggleServiceEdit = (orderId) => {
+        const editArea = document.getElementById(`edit-${orderId}`);
+        if (editArea) editArea.classList.toggle('open');
+    };
+
+    async function saveServiceFromList(orderId) {
+        const record = document.getElementById(`record-${orderId}`).value.trim();
+        const solution = document.getElementById(`solution-${orderId}`).value.trim();
+        if (!record || !solution) { showToast('请完整填写售后记录和方案', 'error'); return; }
+        const { error } = await supabaseClient.from('workorders').update({
+            after_sales_record: record,
+            after_sales_solution: solution,
+            status: 'completed',
+            updated_at: new Date().toISOString()
+        }).eq('id', orderId);
+        if (error) { showToast('保存失败', 'error'); return; }
+        showToast('售后信息保存成功', 'success');
+        renderServiceList();
+        updateBadges();
+    }
+    window.saveServiceFromList = saveServiceFromList;
+
+    // ===================== 工单列表（全局查看） =====================
     async function renderOrderList() {
         if (!dbConfigured) {
             document.getElementById('orderListContainer').innerHTML = '<p style="text-align:center;color:var(--text-secondary);">数据库未连接</p>';
@@ -500,74 +548,43 @@
         if (filtered.length === 0) {
             container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">暂无工单</p>';
         } else {
-            container.innerHTML = filtered.map(o => `
-                <div class="order-item" onclick="openDetailModal('${o.id}')">
-                    <span class="order-id">${o.id}</span>
-                    <div class="order-info">
-                        <div class="hospital">${o.hospitalName}</div>
-                        <div class="device">${o.deviceName} / ${o.deviceModel}</div>
+            container.innerHTML = filtered.map(o => {
+                const statusText = o.status === 'pending' ? '待处理' : o.status === 'processing' ? '处理中' : '已完成';
+                return `
+                    <div class="order-item" onclick="openDetailModal('${o.id}')">
+                        <span class="order-id">${o.id}</span>
+                        <div class="order-info">
+                            <div class="hospital">${o.hospitalName}</div>
+                            <div class="device">${o.deviceName} / ${o.deviceModel}</div>
+                        </div>
+                        <span class="status-badge status-${o.status}">${statusText}</span>
                     </div>
-                    <span class="status-badge status-${o.status}">${o.status==='pending'?'待处理':o.status==='processing'?'处理中':'已完成'}</span>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
-        updatePendingBadge();
+        updateBadges();
     }
     window.renderOrderList = renderOrderList;
 
-    async function updatePendingBadge() {
+    // ===================== 更新角标数字 =====================
+    async function updateBadges() {
         if (!dbConfigured) return;
         const orders = await getAllOrders();
-        const count = orders.filter(o => o.status === 'pending').length;
-        const badge = document.getElementById('pendingBadge');
-        badge.textContent = count || '';
-        badge.className = count ? 'tab-badge show' : 'tab-badge';
+        const pendingCount = orders.filter(o => o.status === 'pending').length;
+        const processingCount = orders.filter(o => o.status === 'processing').length;
+
+        // 售后处理 Tab 显示未处理数量
+        const serviceBadge = document.getElementById('serviceBadge');
+        serviceBadge.textContent = pendingCount || '';
+        serviceBadge.className = pendingCount ? 'tab-badge show' : 'tab-badge';
+
+        // 工单列表 Tab 显示待处理数量
+        const pendingBadge = document.getElementById('pendingBadge');
+        pendingBadge.textContent = pendingCount || '';
+        pendingBadge.className = pendingCount ? 'tab-badge show' : 'tab-badge';
     }
 
-    // ===================== 售后处理 =====================
-    async function searchOrder() {
-        if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
-        const orderId = document.getElementById('searchOrderId').value.trim();
-        if (!orderId) return;
-        const orders = await getAllOrders();
-        const order = orders.find(o => o.id === orderId);
-        const resultDiv = document.getElementById('serviceResult');
-        const emptyDiv = document.getElementById('serviceEmpty');
-        if (!order) {
-            resultDiv.innerHTML = '';
-            emptyDiv.style.display = 'block';
-            emptyDiv.innerHTML = '<p>未找到工单</p>';
-            return;
-        }
-        emptyDiv.style.display = 'none';
-        resultDiv.innerHTML = `
-            <div style="margin-bottom:12px;"><strong>${order.id}</strong> | ${order.hospitalName} | ${order.deviceName}</div>
-            <div class="form-group full"><label>售后核实记录</label><textarea class="form-textarea" id="record-${order.id}">${order.afterSalesRecord||''}</textarea></div>
-            <div class="form-group full"><label>售后处理方案</label><textarea class="form-textarea" id="solution-${order.id}">${order.afterSalesSolution||''}</textarea></div>
-            <button class="btn btn-primary" onclick="saveService('${order.id}')">保存</button>
-        `;
-    }
-    window.searchOrder = searchOrder;
-
-    async function saveService(orderId) {
-        if (!dbConfigured) return;
-        const record = document.getElementById(`record-${orderId}`).value;
-        const solution = document.getElementById(`solution-${orderId}`).value;
-        if (!record || !solution) { showToast('请完整填写', 'error'); return; }
-        const { error } = await supabaseClient.from('workorders').update({
-            after_sales_record: record,
-            after_sales_solution: solution,
-            status: 'completed',
-            updated_at: new Date().toISOString()
-        }).eq('id', orderId);
-        if (error) { showToast('保存失败', 'error'); return; }
-        showToast('保存成功', 'success');
-        searchOrder();
-        updatePendingBadge();
-    }
-    window.saveService = saveService;
-
-    // ===================== 工单详情 =====================
+    // ===================== 工单详情弹窗 =====================
     async function openDetailModal(orderId) {
         if (!dbConfigured) return;
         const orders = await getAllOrders();
@@ -598,7 +615,7 @@
     window.openDetailModal = openDetailModal;
     window.closeDetailModal = closeDetailModal;
 
-    // ===================== 二维码 =====================
+    // ===================== 二维码、导出 =====================
     function showQRCode() {
         const url = window.location.href;
         document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
@@ -613,7 +630,6 @@
     window.closeQRModal = closeQRModal;
     window.copyCurrentURL = copyCurrentURL;
 
-    // ===================== 导出 Excel =====================
     async function exportToExcel() {
         if (!dbConfigured) { showToast('数据库未连接', 'error'); return; }
         const orders = await getAllOrders();
@@ -638,8 +654,9 @@
     // ===================== 初始化 =====================
     (async function() {
         if (dbConfigured) {
-            await updatePendingBadge();
+            await updateBadges();
             await renderOrderList();
+            await renderServiceList();
         }
         switchTab('tab-request');
     })();
